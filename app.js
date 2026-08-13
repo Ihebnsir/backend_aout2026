@@ -4,6 +4,9 @@ var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 
+const http = require('http');
+require('dotenv').config();
+const { connectToMongoDB } = require('./config/mongo.connection');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 
@@ -37,3 +40,10 @@ app.use(function(err, req, res, next) {
 });
 
 module.exports = app;
+const server = http.createServer(app);
+
+connectToMongoDB();
+
+server.listen(process.env.point, () => {
+  console.log('Server is running on port ' + process.env.point);
+});
