@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
 
-const mongoUrl = process.env.MONGO_URL || process.env["mongo-url"] || "mongodb://127.0.0.1:27017/skillbridge";
+const getMongoUrl = () => process.env.MONGO_URL || process.env["mongo-url"] || "mongodb://127.0.0.1:27017/skillbridge";
 
 const connectToMongoDB = async () => {
   try {
-    await mongoose.connect(mongoUrl, {
+    await mongoose.connect(getMongoUrl(), {
       serverSelectionTimeoutMS: 5000,
     });
 
@@ -15,5 +15,5 @@ const connectToMongoDB = async () => {
   }
 };
 
-module.exports = { connectToMongoDB, mongoUrl };
+module.exports = { connectToMongoDB, getMongoUrl };
    

@@ -7,9 +7,12 @@ let mongoServer;
 let token;
 let createdUserId;
 
-before(async () => {
+before(async function () {
+  this.timeout(30000);
+
   mongoServer = await MongoMemoryServer.create();
   process.env.MONGO_URL = mongoServer.getUri();
+  delete process.env['mongo-url'];
   const { connectToMongoDB } = require('../config/mongo.connection');
   await connectToMongoDB();
 
@@ -30,9 +33,16 @@ before(async () => {
   token = jwt.sign({ id: admin._id, role: admin.role }, 'test-secret-key', { expiresIn: '1h' });
 });
 
-after(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+after(async function () {
+  this.timeout(30000);
+
+  if (mongoose.connection.readyState) {
+    await mongoose.disconnect();
+  }
+
+  if (mongoServer) {
+    await mongoServer.stop();
+  }
 });
 
 describe('User CRUD API', () => {
@@ -47,6 +57,9 @@ describe('User CRUD API', () => {
     res.status.should.equal(200);
     res.body.success.should.equal(true);
     res.body.data.user.email.should.equal('admin@test.com');
+    res.body.data.user.should.have.property('emailVerified');
+    res.body.data.user.should.have.property('profileVerified');
+    res.body.data.user.should.have.property('lastLoginAt');
     should.not.exist(res.body.data.user.password);
     should.exist(res.body.data.token);
     token = res.body.data.token;

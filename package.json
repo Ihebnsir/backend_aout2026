@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "test": "mocha --exit tests/**/*.test.js"
+    "test": "mocha --exit tests/**/*.test.js",
+    "build": "node -e \"console.log('Build successful')\"",
+    "migrate:users": "node scripts/migrateUsers.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

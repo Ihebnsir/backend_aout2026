@@ -24,8 +24,11 @@ const login = async (req, res, next) => {
     }
 
     if (user.status !== 'active') {
-      return next(createError(403, 'Compte désactivé ou suspendu'));
+      return next(createError(403, 'Compte inactif ou suspendu'));
     }
+
+    user.lastLoginAt = new Date();
+    await user.save();
 
     const token = jwt.sign(
       {
@@ -40,6 +43,7 @@ const login = async (req, res, next) => {
     const sanitizedUser = user.toObject ? user.toObject() : { ...user };
     delete sanitizedUser.password;
     delete sanitizedUser.__v;
+    sanitizedUser.id = user._id.toString();
 
     return res.status(200).json({
       success: true,

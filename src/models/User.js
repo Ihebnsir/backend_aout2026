@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    ville: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     role: {
       type: String,
       enum: ['apprenant', 'centre', 'admin'],
@@ -50,6 +55,18 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    profileVerified: {
+      type: Boolean,
+      default: false,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -67,11 +84,30 @@ userSchema.pre('save', async function nextHashPassword() {
 userSchema.pre('findOneAndUpdate', async function nextHashPassword() {
   const update = this.getUpdate();
 
-  if (!update || !update.password) {
+  if (!update) {
     return;
   }
 
-  update.password = await bcrypt.hash(update.password, 10);
+  let passwordValue = null;
+
+  if (update.password) {
+    passwordValue = update.password;
+  } else if (update.$set && update.$set.password) {
+    passwordValue = update.$set.password;
+  }
+
+  if (!passwordValue) {
+    return;
+  }
+
+  const hashedPassword = await bcrypt.hash(passwordValue, 10);
+
+  if (update.$set) {
+    update.$set.password = hashedPassword;
+    return;
+  }
+
+  update.password = hashedPassword;
 });
 
 userSchema.methods.comparePassword = async function comparePassword(candidatePassword) {
