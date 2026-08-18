@@ -33,13 +33,15 @@ if (require.main === module) {
   const http = require('http');
   const server = http.createServer(app);
 
-  connectToMongoDB().catch((error) => {
-    console.error('Mongo connection failed:', error.message);
-  });
+  const startServer = async () => {
+    await connectToMongoDB();
 
-  server.listen(process.env.point || 5000, () => {
-    console.log('Server is running on port ' + (process.env.point || 5000));
-  });
+    server.listen(process.env.point || 5000, () => {
+      console.log('Server is running on port ' + (process.env.point || 5000));
+    });
+  };
+
+  startServer();
 }
 
 module.exports = app;
