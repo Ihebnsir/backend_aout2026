@@ -9,6 +9,7 @@ const { connectToMongoDB } = require('./config/mongo.connection');
 var indexRouter = require('./routes/index');
 var usersRouter = require('./src/routes/userRoutes');
 var authRouter = require('./src/routes/authRoutes');
+var centreRouter = require('./src/routes/centreRoutes');
 var errorMiddleware = require('./src/middleware/errorMiddleware');
 
 var app = express();
@@ -22,6 +23,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/centres', centreRouter);
 
 app.use(function(req, res, next) {
   next(createError(404, 'Route introuvable'));
