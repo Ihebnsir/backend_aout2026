@@ -16,4 +16,4 @@ const connectToMongoDB = async () => {
 };
 
 module.exports = { connectToMongoDB, getMongoUrl };
-   
+console.log("MongoDB URL:", getMongoUrl().replace(/\/\/.*@/, '//***:***@'));
