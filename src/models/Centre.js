@@ -16,6 +16,8 @@ const centreSchema = new mongoose.Schema(
     adresse: { type: String, trim: true, maxlength: 250, default: '' },
     email: { type: String, trim: true, lowercase: true, maxlength: 254, default: '' },
     telephone: { type: String, trim: true, maxlength: 30, default: '' },
+    matriculeFiscal: { type: String, trim: true, maxlength: 100, default: '' },
+    numeroRNE: { type: String, trim: true, maxlength: 100, default: '' },
     siteWeb: { type: String, trim: true, maxlength: 500, default: '' },
     logo: { type: String, trim: true, default: '' },
     cover: { type: String, trim: true, default: '' },
