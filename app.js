@@ -11,10 +11,12 @@ var usersRouter = require('./src/routes/userRoutes');
 var authRouter = require('./src/routes/authRoutes');
 var centreRouter = require('./src/routes/centreRoutes');
 var errorMiddleware = require('./src/middleware/errorMiddleware');
+var logMiddleware = require('./src/middleware/logMiddleware');
 
 var app = express();
 
 app.use(logger('dev'));
+app.use(logMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
