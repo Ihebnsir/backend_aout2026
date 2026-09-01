@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const createError = require('http-errors');
 const User = require('../models/User');
 const centreService = require('../services/centreService');
+const notificationService = require('../services/notificationService');
+const emailService = require('../services/emailService');
 const { JWT_SECRET } = require('../middleware/authMiddleware');
 
 const sanitizeUser = (user) => {
@@ -73,6 +75,27 @@ const register = async (req, res, next) => {
         },
         user._id
       );
+    }
+
+    try {
+      await notificationService.notifyAdmins(
+        'Nouvel utilisateur inscrit',
+        `${user.prenom} ${user.nom} vient de créer un compte ${user.role}.`,
+        'users'
+      );
+    } catch (error) {
+      // best effort only
+    }
+
+    try {
+      await emailService.sendEmail({
+        to: user.email,
+        subject: 'Bienvenue sur SkillBridge 🎓',
+        text: `Bonjour ${user.prenom},\n\nBienvenue sur SkillBridge !\n\nVotre compte a été créé avec succès.\n\nVous pouvez maintenant accéder à votre espace et découvrir les formations disponibles.\n\nÀ bientôt,\nL'équipe SkillBridge`,
+        html: `<p>Bonjour ${user.prenom},</p><p>Bienvenue sur SkillBridge !</p><p>Votre compte a été créé avec succès.</p><p>Vous pouvez maintenant accéder à votre espace et découvrir les formations disponibles.</p><p>À bientôt,<br>L'équipe SkillBridge</p>`,
+      });
+    } catch (emailError) {
+      console.error('[EMAIL] Échec de l’envoi de bienvenue:', emailError.message);
     }
 
     return res.status(201).json({

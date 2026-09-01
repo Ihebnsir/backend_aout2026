@@ -10,6 +10,15 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./src/routes/userRoutes');
 var authRouter = require('./src/routes/authRoutes');
 var centreRouter = require('./src/routes/centreRoutes');
+var formationRouter = require('./src/routes/formationRoutes');
+var reservationRouter = require('./src/routes/reservationRoutes');
+var centreDocumentRouter = require('./src/routes/centreDocumentRoutes');
+var certificationRouter = require('./src/routes/certificationRoutes');
+var noteRouter = require('./src/routes/noteRoutes');
+var notificationRouter = require('./src/routes/notificationRoutes');
+var signalementRouter = require('./src/routes/signalementRoutes');
+var litigeRouter = require('./src/routes/litigeRoutes');
+var dashboardRouter = require('./src/routes/dashboardRoutes');
 var errorMiddleware = require('./src/middleware/errorMiddleware');
 var logMiddleware = require('./src/middleware/logMiddleware');
 
@@ -26,6 +35,15 @@ app.use('/', indexRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/centres', centreRouter);
+app.use('/api/formations', formationRouter);
+app.use('/api/reservations', reservationRouter);
+app.use('/api/centre-documents', centreDocumentRouter);
+app.use('/api/certifications', certificationRouter);
+app.use('/api/notes', noteRouter);
+app.use('/api/notifications', notificationRouter);
+app.use('/api/signalements', signalementRouter);
+app.use('/api/litiges', litigeRouter);
+app.use('/api/admin/dashboard', dashboardRouter);
 
 app.use(function(req, res, next) {
   next(createError(404, 'Route introuvable'));

@@ -3,6 +3,16 @@ const mongoose = require("mongoose");
 const getMongoUrl = () => process.env.MONGO_URL || process.env["mongo-url"] || "mongodb://127.0.0.1:27017/skillbridge";
 
 const connectToMongoDB = async () => {
+  const currentUrl = mongoose.connection?.client?.s?.url || mongoose.connection?.uri;
+
+  if (mongoose.connection.readyState === 1) {
+    if (!currentUrl || currentUrl === getMongoUrl()) {
+      return;
+    }
+
+    await mongoose.disconnect();
+  }
+
   try {
     await mongoose.connect(getMongoUrl(), {
       serverSelectionTimeoutMS: 5000,

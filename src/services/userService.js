@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const notificationService = require('./notificationService');
 
 const sanitizeUser = (user) => {
   if (!user) return null;
@@ -64,6 +65,17 @@ const findUserById = async (id) => {
 
 const createUser = async (payload) => {
   const user = await User.create(payload);
+
+  try {
+    await notificationService.notifyAdmins(
+      'Nouvel utilisateur inscrit',
+      `${user.prenom} ${user.nom} vient de créer un compte ${user.role}.`,
+      'users'
+    );
+  } catch (error) {
+    // best effort only
+  }
+
   return sanitizeUser(user);
 };
 

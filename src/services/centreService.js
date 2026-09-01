@@ -1,5 +1,6 @@
 const Centre = require('../models/Centre');
 const CentreHistory = require('../models/CentreHistory');
+const notificationService = require('./notificationService');
 
 const sanitizeCentre = (centre) => {
   if (!centre) return null;
@@ -14,6 +15,17 @@ const addHistory = (centreId, action, details, adminId = null) =>
 const createCentre = async (payload, userId) => {
   const centre = await Centre.create({ ...payload, userId, statutVerification: 'EN_ATTENTE', dateDemande: new Date() });
   await addHistory(centre._id, 'SOUMISSION', 'Profil centre soumis pour vérification');
+
+  try {
+    await notificationService.notifyAdmins(
+      'Nouveau centre créé',
+      `Le centre "${centre.name}" a soumis une demande de vérification.`,
+      'centres'
+    );
+  } catch (error) {
+    // best effort only
+  }
+
   return sanitizeCentre(centre);
 };
 
@@ -50,7 +62,21 @@ const verifyCentre = async (id, adminId) => {
     { statutVerification: 'VERIFIE', verifie: true, dateValidation: new Date(), motifRejet: null },
     { new: true, runValidators: true }
   ).lean();
-  if (centre) await addHistory(id, 'VERIFICATION', 'Centre vérifié', adminId);
+  if (centre) {
+    await addHistory(id, 'VERIFICATION', 'Centre vérifié', adminId);
+
+    try {
+      await notificationService.createNotification({
+        role: 'centre',
+        userId: centre.userId,
+        title: 'Profil vérifié',
+        message: 'Votre profil centre a été vérifié avec succès.',
+        category: 'system',
+      });
+    } catch (error) {
+      // best effort only
+    }
+  }
   return sanitizeCentre(centre);
 };
 
@@ -60,7 +86,21 @@ const rejectCentre = async (id, motifRejet, adminId) => {
     { statutVerification: 'REJETE', verifie: false, motifRejet, dateValidation: null },
     { new: true, runValidators: true }
   ).lean();
-  if (centre) await addHistory(id, 'REJET', motifRejet, adminId);
+  if (centre) {
+    await addHistory(id, 'REJET', motifRejet, adminId);
+
+    try {
+      await notificationService.createNotification({
+        role: 'centre',
+        userId: centre.userId,
+        title: 'Profil centre rejeté',
+        message: `Votre profil centre a été rejeté. Motif : ${motifRejet}`,
+        category: 'system',
+      });
+    } catch (error) {
+      // best effort only
+    }
+  }
   return sanitizeCentre(centre);
 };
 
@@ -70,7 +110,21 @@ const suspendCentre = async (id, adminId) => {
     { statutVerification: 'SUSPENDU', verifie: false },
     { new: true, runValidators: true }
   ).lean();
-  if (centre) await addHistory(id, 'SUSPENSION', 'Centre suspendu', adminId);
+  if (centre) {
+    await addHistory(id, 'SUSPENSION', 'Centre suspendu', adminId);
+
+    try {
+      await notificationService.createNotification({
+        role: 'centre',
+        userId: centre.userId,
+        title: 'Profil centre suspendu',
+        message: 'Votre profil centre a été suspendu par l’administration.',
+        category: 'system',
+      });
+    } catch (error) {
+      // best effort only
+    }
+  }
   return sanitizeCentre(centre);
 };
 

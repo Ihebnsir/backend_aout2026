@@ -1,24 +1,17 @@
 const request = require('supertest');
 const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
 const app = require('../app');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
-let mongoServer;
 let token;
 let createdUserId;
 
 before(async function () {
   this.timeout(30000);
 
-  mongoServer = await MongoMemoryServer.create();
-  process.env.MONGO_URL = mongoServer.getUri();
-  delete process.env['mongo-url'];
-  const { connectToMongoDB } = require('../config/mongo.connection');
-  await connectToMongoDB();
+  await connectTestDatabase();
 
   const User = require('../src/models/User');
-  await User.deleteMany({});
-
   const admin = await User.create({
     nom: 'Admin',
     prenom: 'Test',
@@ -40,9 +33,7 @@ after(async function () {
     await mongoose.disconnect();
   }
 
-  if (mongoServer) {
-    await mongoServer.stop();
-  }
+  await disconnectTestDatabase();
 });
 
 describe('User CRUD API', () => {
