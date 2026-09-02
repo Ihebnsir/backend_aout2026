@@ -30,10 +30,19 @@ const getTransporter = () => {
   return transporter;
 };
 
+const verifyTransporter = async () => {
+  const smtpTransporter = getTransporter();
+  await smtpTransporter.verify();
+  return true;
+};
+
 const sendEmail = async ({ to, subject, html, text }) => {
   if (!to || !subject || (!html && !text)) {
     throw new Error('Destinataire, sujet et contenu email obligatoires');
   }
+
+  console.log('[EMAIL DEBUG] Preparing welcome email for:', to);
+  console.log('[EMAIL DEBUG] Sending email...');
 
   const info = await getTransporter().sendMail({
     from: process.env.EMAIL_FROM,
@@ -43,8 +52,17 @@ const sendEmail = async ({ to, subject, html, text }) => {
     text,
   });
 
+  console.log('[EMAIL DEBUG] Email sent successfully', {
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
+  });
+
   return {
     accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
     messageId: info.messageId,
   };
 };
@@ -53,4 +71,4 @@ const resetTransporter = () => {
   transporter = undefined;
 };
 
-module.exports = { sendEmail, resetTransporter };
+module.exports = { sendEmail, resetTransporter, verifyTransporter };

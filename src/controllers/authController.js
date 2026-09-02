@@ -87,6 +87,7 @@ const register = async (req, res, next) => {
       // best effort only
     }
 
+    console.log('[EMAIL DEBUG] Registration successful');
     try {
       await emailService.sendEmail({
         to: user.email,
@@ -95,7 +96,7 @@ const register = async (req, res, next) => {
         html: `<p>Bonjour ${user.prenom},</p><p>Bienvenue sur SkillBridge !</p><p>Votre compte a été créé avec succès.</p><p>Vous pouvez maintenant accéder à votre espace et découvrir les formations disponibles.</p><p>À bientôt,<br>L'équipe SkillBridge</p>`,
       });
     } catch (emailError) {
-      console.error('[EMAIL] Échec de l’envoi de bienvenue:', emailError.message);
+      console.error('[EMAIL DEBUG] Email sending failed:', emailError.message);
     }
 
     return res.status(201).json({
