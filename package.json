@@ -8,6 +8,7 @@
     "test": "mocha --exit tests/**/*.test.js",
     "build": "node -e \"console.log('Build successful')\"",
     "migrate:users": "node scripts/migrateUsers.js",
+    "seed:formations": "node scripts/seedFormations.js",
     "seed:admin": "node scripts/seedAdmin.js"
   },
   "dependencies": {
