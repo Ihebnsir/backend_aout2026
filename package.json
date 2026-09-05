@@ -8,7 +8,11 @@
     "test": "mocha --exit tests/**/*.test.js",
     "build": "node -e \"console.log('Build successful')\"",
     "migrate:users": "node scripts/migrateUsers.js",
-    "seed:admin": "node scripts/seedAdmin.js"
+    "seed:admin": "node scripts/seedAdmin.js",
+    "seed:user": "node scripts/seedUser.js",
+    "seed:formations": "node scripts/seedFormations.js",
+    "seed:sessions": "node scripts/seedSessions.js",
+    "seed:reservations": "node scripts/seedReservations.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -23,12 +27,14 @@
     "mongoose": "^9.9.2",
     "morgan": "~1.9.1",
     "nodemailer": "^9.1.1",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "chai": "^6.2.2",
     "mocha": "^11.8.0",
     "mongodb-memory-server": "^11.2.0",
+    "socket.io-client": "^4.8.3",
     "supertest": "^7.2.2"
   }
 }

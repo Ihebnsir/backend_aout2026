@@ -81,7 +81,7 @@ reservationSchema.index(
 );
 
 // Initialiser l'historique à la création
-reservationSchema.pre('save', function (next) {
+reservationSchema.pre('save', function () {
   if (this.isNew && this.history.length === 0) {
     this.history.push({
       date: new Date(),
@@ -89,7 +89,6 @@ reservationSchema.pre('save', function (next) {
       icon: 'create',
     });
   }
-  next();
 });
 
 module.exports = mongoose.model('Reservation', reservationSchema);

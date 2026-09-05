@@ -36,27 +36,39 @@ const verifyTransporter = async () => {
   return true;
 };
 
-const sendEmail = async ({ to, subject, html, text }) => {
+const sendEmail = async ({ to, subject, html, text, replyTo }) => {
   if (!to || !subject || (!html && !text)) {
     throw new Error('Destinataire, sujet et contenu email obligatoires');
   }
 
-  console.log('[EMAIL DEBUG] Preparing welcome email for:', to);
+  console.log('[EMAIL DEBUG] Preparing email for recipient:', to);
   console.log('[EMAIL DEBUG] Sending email...');
 
-  const info = await getTransporter().sendMail({
-    from: process.env.EMAIL_FROM,
+  const mailOptions = {
+    from: {
+      name: 'SkillBridge',
+      address: process.env.EMAIL_FROM,
+    },
     to,
     subject,
-    html,
     text,
-  });
+    html,
+  };
+
+  // Add replyTo if provided or use default
+  if (replyTo) {
+    mailOptions.replyTo = replyTo;
+  } else if (process.env.EMAIL_FROM) {
+    mailOptions.replyTo = process.env.EMAIL_FROM;
+  }
+
+  const info = await getTransporter().sendMail(mailOptions);
 
   console.log('[EMAIL DEBUG] Email sent successfully', {
+    recipient: to,
     messageId: info.messageId,
     accepted: info.accepted,
     rejected: info.rejected,
-    response: info.response,
   });
 
   return {

@@ -4,7 +4,7 @@ const User = require('../models/User');
 const centreService = require('../services/centreService');
 const notificationService = require('../services/notificationService');
 const emailService = require('../services/emailService');
-const { JWT_SECRET } = require('../middleware/authMiddleware');
+const { getJwtSecret } = require('../middleware/authMiddleware');
 
 const sanitizeUser = (user) => {
   const sanitizedUser = user.toObject ? user.toObject() : { ...user };
@@ -14,16 +14,23 @@ const sanitizeUser = (user) => {
   return sanitizedUser;
 };
 
-const signToken = (user) => jwt.sign(
-  {
-    userId: user._id,
-    id: user._id,
-    role: user.role,
-    email: user.email,
-  },
-  JWT_SECRET,
-  { expiresIn: '1h' }
-);
+const signToken = (user) => {
+  const jwtSecret = getJwtSecret();
+  if (!jwtSecret) {
+    throw createError(503, 'Service d\'authentification indisponible');
+  }
+
+  return jwt.sign(
+    {
+      userId: user._id,
+      id: user._id,
+      role: user.role,
+      email: user.email,
+    },
+    jwtSecret,
+    { expiresIn: '1h' }
+  );
+};
 
 const register = async (req, res, next) => {
   let user;
@@ -89,11 +96,56 @@ const register = async (req, res, next) => {
 
     console.log('[EMAIL DEBUG] Registration successful');
     try {
+      const plainText = `Bonjour ${user.prenom},\n\nBienvenue sur SkillBridge!\n\nVotre compte a été créé avec succès.\n\nVous pouvez maintenant accéder à votre espace et découvrir les formations disponibles.\n\nCordialement,\nL'équipe SkillBridge`;
+
+      const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bienvenue sur SkillBridge</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5;">
+  <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;">
+    <!-- Header -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 20px; text-align: center;">
+      <h1 style="margin: 0; color: #ffffff; font-size: 28px;">SkillBridge</h1>
+      <p style="margin: 8px 0 0 0; color: #e0e0e0; font-size: 14px;">Plateforme de Formations</p>
+    </div>
+
+    <!-- Content -->
+    <div style="padding: 40px 30px;">
+      <p style="margin: 0 0 20px 0; font-size: 16px;">Bonjour <strong>${user.prenom}</strong>,</p>
+      
+      <p style="margin: 0 0 20px 0; font-size: 16px;">Bienvenue sur <strong>SkillBridge</strong>!</p>
+      
+      <p style="margin: 0 0 20px 0; font-size: 16px;">Votre compte a été créé avec succès et vous pouvez dès maintenant:</p>
+      
+      <ul style="margin: 0 0 20px 0; padding-left: 20px; font-size: 16px;">
+        <li style="margin-bottom: 10px;">Accéder à votre espace personnel</li>
+        <li style="margin-bottom: 10px;">Découvrir les formations disponibles</li>
+        <li style="margin-bottom: 10px;">Vous inscrire à des sessions de formation</li>
+        <li>Suivre votre progression et vos certifications</li>
+      </ul>
+      
+      <p style="margin: 0 0 30px 0; font-size: 16px;">Si vous avez besoin d'aide ou si vous avez des questions, n'hésitez pas à nous contacter.</p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f9f9f9; padding: 20px 30px; border-top: 1px solid #e0e0e0; font-size: 14px; color: #666;">
+      <p style="margin: 0 0 10px 0;">Cordialement,</p>
+      <p style="margin: 0 0 20px 0;"><strong>L'équipe SkillBridge</strong></p>
+      <p style="margin: 0; color: #999; font-size: 12px;">Cet email est un message transactionnel. Merci de ne pas répondre directement à cet email.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
       await emailService.sendEmail({
         to: user.email,
-        subject: 'Bienvenue sur SkillBridge 🎓',
-        text: `Bonjour ${user.prenom},\n\nBienvenue sur SkillBridge !\n\nVotre compte a été créé avec succès.\n\nVous pouvez maintenant accéder à votre espace et découvrir les formations disponibles.\n\nÀ bientôt,\nL'équipe SkillBridge`,
-        html: `<p>Bonjour ${user.prenom},</p><p>Bienvenue sur SkillBridge !</p><p>Votre compte a été créé avec succès.</p><p>Vous pouvez maintenant accéder à votre espace et découvrir les formations disponibles.</p><p>À bientôt,<br>L'équipe SkillBridge</p>`,
+        subject: 'Bienvenue sur SkillBridge - Votre compte est actif',
+        text: plainText,
+        html: htmlContent,
       });
     } catch (emailError) {
       console.error('[EMAIL DEBUG] Email sending failed:', emailError.message);

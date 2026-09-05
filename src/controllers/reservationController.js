@@ -11,7 +11,8 @@ const ensureId = (id) => {
 
 const ensureReservationOwner = (reservation, req) => {
   if (req.user.role === 'admin') return;
-  if (!reservation || reservation.learnerId.toString() !== req.user.id.toString()) {
+  const learnerId = reservation && (reservation.learnerId._id || reservation.learnerId);
+  if (!learnerId || learnerId.toString() !== req.user.id.toString()) {
     throw createError(403, 'Accès interdit');
   }
 };

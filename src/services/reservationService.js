@@ -290,12 +290,11 @@ const completeReservation = async (id) => {
 };
 
 const payReservation = async (id, paymentMethod) => {
-  const reservation = await Reservation.findById(id);
+  const reservation = await Reservation.findById(id).select('status paid price');
   if (!reservation) {
     throw createError(404, 'Réservation introuvable');
   }
 
-  // Vérifier que la réservation est dans un état payable
   if (reservation.status === 'CANCELLED') {
     throw createError(400, 'Impossible de payer une réservation annulée');
   }
@@ -304,24 +303,59 @@ const payReservation = async (id, paymentMethod) => {
     throw createError(400, 'Impossible de payer une réservation terminée');
   }
 
-  // Vérifier qu'elle n'est pas déjà payée
   if (reservation.paid) {
     throw createError(409, 'Cette réservation est déjà payée');
   }
 
-  // Effectuer le paiement
-  reservation.paid = true;
-  reservation.paymentDate = new Date();
-  reservation.paymentMethod = paymentMethod;
-  reservation.transactionId = generateTransactionId();
+  if (!Number.isFinite(reservation.price) || reservation.price < 0) {
+    throw createError(400, 'Prix de réservation invalide');
+  }
 
-  // Ajouter à l'historique
-  addHistoryEntry(reservation, 'Paiement effectué', 'payment');
+  const paymentDate = new Date();
+  const transactionId = generateTransactionId();
+  const updatedReservation = await Reservation.findOneAndUpdate(
+    {
+      _id: id,
+      paid: false,
+      status: { $in: ['PENDING', 'CONFIRMED'] },
+    },
+    {
+      $set: {
+        paid: true,
+        paymentDate,
+        paymentMethod,
+        transactionId,
+      },
+      $push: {
+        history: {
+          date: paymentDate,
+          action: 'Paiement effectué',
+          icon: 'payment',
+        },
+      },
+    },
+    { new: true, runValidators: true }
+  );
 
-  await reservation.save();
+  if (!updatedReservation) {
+    const currentReservation = await Reservation.findById(id).select('paid status');
+    if (!currentReservation) {
+      throw createError(404, 'Réservation introuvable');
+    }
+    if (currentReservation.paid) {
+      throw createError(409, 'Cette réservation est déjà payée');
+    }
+    if (currentReservation.status === 'CANCELLED') {
+      throw createError(400, 'Impossible de payer une réservation annulée');
+    }
+    if (currentReservation.status === 'COMPLETED') {
+      throw createError(400, 'Impossible de payer une réservation terminée');
+    }
+    throw createError(400, 'Impossible de payer cette réservation');
+  }
 
   // Populer et retourner
-  await reservation.populate([
+  await updatedReservation.populate([
     { path: 'learnerId', select: 'nom prenom email' },
     { path: 'formationId', select: 'title image price duration category startDate endDate' },
     { path: 'centreId', select: 'name logo userId' },
@@ -330,32 +364,32 @@ const payReservation = async (id, paymentMethod) => {
   try {
     await notificationService.createNotification({
       role: 'apprenant',
-      userId: reservation.learnerId._id,
+      userId: updatedReservation.learnerId._id,
       title: 'Paiement confirmé',
-      message: `Votre paiement pour la formation "${reservation.formationId.title}" a bien été confirmé.`,
+      message: `Votre paiement pour la formation "${updatedReservation.formationId.title}" a bien été confirmé.`,
       category: 'paiements',
     });
 
-    if (reservation.centreId && reservation.centreId.userId) {
+    if (updatedReservation.centreId && updatedReservation.centreId.userId) {
       await notificationService.createNotification({
         role: 'centre',
-        userId: reservation.centreId.userId,
+        userId: updatedReservation.centreId.userId,
         title: 'Paiement reçu',
-        message: `Le paiement pour la formation "${reservation.formationId.title}" a été reçu.`,
+        message: `Le paiement pour la formation "${updatedReservation.formationId.title}" a été reçu.`,
         category: 'paiements',
       });
     }
 
     await notificationService.notifyAdmins(
       'Paiement reçu',
-      `Un paiement a été reçu pour la formation "${reservation.formationId.title}".`,
+      `Un paiement a été reçu pour la formation "${updatedReservation.formationId.title}".`,
       'paiements'
     );
   } catch (error) {
     // best effort only
   }
 
-  return sanitizeReservation(reservation);
+  return sanitizeReservation(updatedReservation);
 };
 
 const deleteReservation = async (id) => {

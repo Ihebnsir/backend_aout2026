@@ -261,7 +261,7 @@ const updateLitigeStatus = async (litigeId, newStatus) => {
     { path: 'responsable', select: 'nom prenom email' },
   ]);
 
-  return sanitizeLitige(updated, userRole === 'admin');
+  return sanitizeLitige(updated, true);
 };
 
 const ajouterMessageConversation = async (litigeId, auteurId, userRole, message, centreId = null) => {

@@ -21,6 +21,19 @@ const optionalString = (field, max, message) =>
 const optionalNumber = (field, min, max, message) =>
   body(field).optional({ nullable: true }).isFloat({ min, max }).withMessage(message);
 
+const sessionsRule = body('sessions')
+  .optional({ nullable: true })
+  .isArray()
+  .withMessage('sessions doit être un tableau')
+  .custom((sessions) => sessions.every((session) => (
+    session && typeof session.title === 'string' && session.title.trim()
+      && Number.isInteger(Number(session.order)) && Number(session.order) >= 1
+      && (!session.description || typeof session.description === 'string')
+      && (!session.duration || typeof session.duration === 'string')
+      && (!session.date || !Number.isNaN(Date.parse(session.date)))
+  )))
+  .withMessage('Chaque session doit contenir un titre et un ordre valide');
+
 const createFormationRules = [
   body('title')
     .trim()
@@ -94,6 +107,8 @@ const createFormationRules = [
       }
       return true;
     }),
+
+  sessionsRule,
 
   // Vérifier que les champs sensibles ne sont pas présents
   body('centre')
@@ -207,6 +222,8 @@ const updateFormationRules = [
       }
       return true;
     }),
+
+  sessionsRule,
 
   // Vérifier que les champs sensibles ne sont pas présents
   body('centre')

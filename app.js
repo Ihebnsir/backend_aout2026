@@ -19,11 +19,31 @@ var notificationRouter = require('./src/routes/notificationRoutes');
 var signalementRouter = require('./src/routes/signalementRoutes');
 var litigeRouter = require('./src/routes/litigeRoutes');
 var dashboardRouter = require('./src/routes/dashboardRoutes');
+var messagingRouter = require('./src/routes/messagingRoutes');
 var errorMiddleware = require('./src/middleware/errorMiddleware');
 var logMiddleware = require('./src/middleware/logMiddleware');
 var emailService = require('./src/services/emailService');
+var setupMessagingRealtime = require('./src/realtime/messagingRealtime');
 
 var app = express();
+
+const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+app.use((req, res, next) => {
+  const requestOrigin = req.headers.origin;
+
+  if (requestOrigin === corsOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+
+  return next();
+});
 
 app.use(logger('dev'));
 app.use(logMiddleware);
@@ -45,6 +65,7 @@ app.use('/api/notifications', notificationRouter);
 app.use('/api/signalements', signalementRouter);
 app.use('/api/litiges', litigeRouter);
 app.use('/api/admin/dashboard', dashboardRouter);
+app.use('/api/conversations', messagingRouter);
 
 app.use(function(req, res, next) {
   next(createError(404, 'Route introuvable'));
@@ -55,6 +76,7 @@ app.use(errorMiddleware);
 if (require.main === module) {
   const http = require('http');
   const server = http.createServer(app);
+  setupMessagingRealtime(server, corsOrigin);
 
   const startServer = async () => {
     await connectToMongoDB();

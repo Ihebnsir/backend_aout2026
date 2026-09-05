@@ -113,6 +113,24 @@ const payReservationRules = [
     .isLength({ max: 100 })
     .withMessage('paymentMethod ne doit pas dépasser 100 caractères'),
 
+  body('amount')
+    .custom((value) => {
+      if (value !== undefined) {
+        throw new Error('Vous ne pouvez pas définir amount');
+      }
+      return true;
+    })
+    .optional(),
+
+  body('price')
+    .custom((value) => {
+      if (value !== undefined) {
+        throw new Error('Vous ne pouvez pas modifier price');
+      }
+      return true;
+    })
+    .optional(),
+
   // Interdire les modifications
   body('paid')
     .custom((value) => {

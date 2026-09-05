@@ -99,7 +99,7 @@ const litigeSchema = new mongoose.Schema(
         },
         role: {
           type: String,
-          enum: ['etudiant', 'centre', 'admin', 'system'],
+          enum: ['apprenant', 'etudiant', 'centre', 'admin', 'system'],
           required: true,
         },
         message: String,

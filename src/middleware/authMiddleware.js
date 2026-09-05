@@ -3,9 +3,14 @@ const mongoose = require('mongoose');
 const createError = require('http-errors');
 const User = require('../models/User');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
+const getJwtSecret = () => process.env.JWT_SECRET;
 
 const authenticate = async (req, res, next) => {
+  const jwtSecret = getJwtSecret();
+  if (!jwtSecret) {
+    return next(createError(503, 'Service d\'authentification indisponible'));
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -15,7 +20,7 @@ const authenticate = async (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, jwtSecret);
     const userId = decoded.userId || decoded.id;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -41,5 +46,5 @@ const authenticate = async (req, res, next) => {
 
 module.exports = {
   authenticate,
-  JWT_SECRET,
+  getJwtSecret,
 };

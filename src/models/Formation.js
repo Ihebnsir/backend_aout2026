@@ -1,5 +1,38 @@
 const mongoose = require('mongoose');
 
+const sessionSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 200,
+    },
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 2000,
+      default: '',
+    },
+    date: {
+      type: Date,
+      default: null,
+    },
+    duration: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+      default: '',
+    },
+    order: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+  },
+  { _id: true }
+);
+
 const formationSchema = new mongoose.Schema(
   {
     centre: {
@@ -75,6 +108,10 @@ const formationSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: '',
+    },
+    sessions: {
+      type: [sessionSchema],
+      default: [],
     },
   },
   {
