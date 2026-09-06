@@ -20,7 +20,7 @@ const buildScopeFilter = (role, userId) => {
   return filter;
 };
 
-const createNotification = async ({ role, userId, title, message, category }) => {
+const createNotification = async ({ role, userId, title, message, category, conversationId = null }) => {
   if (role === 'admin' && userId) {
     throw createError(400, 'userId doit être null pour role admin');
   }
@@ -35,19 +35,21 @@ const createNotification = async ({ role, userId, title, message, category }) =>
     title,
     message,
     category,
+    conversationId,
     lu: false,
   });
 
   return sanitizeNotification(notification);
 };
 
-const notifyAdmins = async (title, message, category) => {
+const notifyAdmins = async (title, message, category, conversationId = null) => {
   const notification = await Notification.create({
     role: 'admin',
     userId: null,
     title,
     message,
     category,
+    conversationId,
     lu: false,
   });
 

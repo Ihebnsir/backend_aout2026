@@ -36,8 +36,17 @@ const supportRules = [
 
 const messageRules = [
   ...idRules,
-  body('content').isString().trim().notEmpty().withMessage('content est obligatoire').isLength({ max: 5000 }).withMessage('content ne doit pas dépasser 5000 caractères'),
+  body('content').optional().isString().trim().isLength({ max: 5000 }).withMessage('content ne doit pas dépasser 5000 caractères'),
+  body('attachments').optional().isArray({ max: Number(process.env.MAX_ATTACHMENTS_PER_MESSAGE || 5) }).withMessage('attachments invalide'),
   body('clientMessageId').optional().isString().trim().isLength({ min: 1, max: 100 }).withMessage('clientMessageId invalide'),
+  body().custom((value, { req }) => {
+    const hasContent = typeof req.body.content === 'string' && req.body.content.trim().length > 0;
+    const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : [];
+    if (!hasContent && attachments.length === 0) {
+      throw new Error('content ou attachments est obligatoire');
+    }
+    return true;
+  }),
 ];
 
 const statusRules = [

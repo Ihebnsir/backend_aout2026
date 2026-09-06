@@ -120,24 +120,20 @@ const formationSchema = new mongoose.Schema(
 );
 
 // Validation personnalisée : endDate >= startDate
-formationSchema.pre('save', function(next) {
+formationSchema.pre('save', function() {
   if (this.startDate && this.endDate && this.endDate < this.startDate) {
-    const err = new Error('endDate doit être supérieur ou égal à startDate');
-    return next(err);
+    throw new Error('endDate doit être supérieur ou égal à startDate');
   }
-  next();
 });
 
 // Validation pour update
-formationSchema.pre('findOneAndUpdate', function(next) {
+formationSchema.pre('findOneAndUpdate', function() {
   const update = this.getUpdate();
   if (update.$set && update.$set.endDate && update.$set.startDate) {
     if (update.$set.endDate < update.$set.startDate) {
-      const err = new Error('endDate doit être supérieur ou égal à startDate');
-      return next(err);
+      throw new Error('endDate doit être supérieur ou égal à startDate');
     }
   }
-  next();
 });
 
 module.exports = mongoose.model('Formation', formationSchema);

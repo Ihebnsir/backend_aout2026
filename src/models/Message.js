@@ -21,9 +21,23 @@ const messageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: '',
       trim: true,
       maxlength: 5000,
+    },
+    attachments: {
+      type: [
+        {
+          id: { type: mongoose.Schema.Types.ObjectId, required: true },
+          originalName: { type: String, required: true, trim: true, maxlength: 255 },
+          storedName: { type: String, required: true, trim: true, maxlength: 255 },
+          mimeType: { type: String, required: true, trim: true, maxlength: 200 },
+          size: { type: Number, required: true, min: 1 },
+          url: { type: String, required: true, trim: true, maxlength: 500 },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
     },
     clientMessageId: {
       type: String,

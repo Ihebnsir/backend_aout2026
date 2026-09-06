@@ -2,10 +2,12 @@ const createError = require('http-errors');
 const mongoose = require('mongoose');
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
+const Attachment = require('../models/Attachment');
 const User = require('../models/User');
 const Centre = require('../models/Centre');
 const Formation = require('../models/Formation');
 const notificationService = require('./notificationService');
+const { getAttachmentConfig } = require('./attachmentStorage');
 
 let emitMessage = () => {};
 
@@ -181,6 +183,59 @@ const getConversation = async (conversationId, user, { page, limit } = {}) => {
   };
 };
 
+const previewMessageText = (message) => {
+  const text = typeof message?.content === 'string' ? message.content.trim() : '';
+  if (text) return text.length > 120 ? `${text.slice(0, 117)}...` : text;
+  const attachments = Array.isArray(message?.attachments) ? message.attachments : [];
+  if (attachments.length > 0) {
+    const names = attachments.slice(0, 2).map((attachment) => attachment.originalName || 'document joint');
+    return names.length > 1 ? `${names[0]} + ${attachments.length - 1}` : names[0];
+  }
+  return 'Nouveau message';
+};
+
+const resolveMessageAttachments = async (conversation, sender, attachments = []) => {
+  const normalized = Array.isArray(attachments) ? attachments : [];
+  const { maxPerMessage } = getAttachmentConfig();
+
+  if (normalized.length > maxPerMessage) {
+    throw createError(400, `Trop de pièces jointes (${normalized.length} > ${maxPerMessage})`);
+  }
+
+  if (normalized.length === 0) return [];
+
+  const attachmentIds = normalized.map((attachment) => attachment?.id).filter(Boolean);
+  if (attachmentIds.length !== normalized.length) {
+    throw createError(400, 'Métadonnées de pièce jointe invalides');
+  }
+
+  const records = await Attachment.find({
+    _id: { $in: attachmentIds },
+    conversationId: conversation._id,
+  }).lean();
+
+  if (records.length !== attachmentIds.length) {
+    throw createError(400, 'Pièce jointe non valide pour cette conversation');
+  }
+
+  const recordMap = new Map(records.map((record) => [record._id.toString(), record]));
+  return normalized.map((attachment) => {
+    const record = recordMap.get(attachment.id.toString());
+    if (!record) {
+      throw createError(400, 'Pièce jointe non valide pour cette conversation');
+    }
+    return {
+      id: record._id,
+      originalName: record.originalName,
+      storedName: record.storedName,
+      mimeType: record.mimeType,
+      size: record.size,
+      url: record.url,
+      createdAt: record.createdAt,
+    };
+  });
+};
+
 const createInitialMessage = async (conversation, sender, content) => {
   if (!content) return null;
   return createMessage(conversation, sender, content, null);
@@ -253,7 +308,7 @@ const createSupportConversation = async (learnerId, { subject, initialMessage } 
 };
 
 const notifyNewMessage = async (conversation, sender, message) => {
-  const preview = message.content.length > 120 ? `${message.content.slice(0, 117)}...` : message.content;
+  const preview = previewMessageText(message);
   try {
     if (conversation.type === 'direct') {
       const recipientId = sender.role === 'apprenant' ? conversation.centreUserId : conversation.learnerUserId;
@@ -264,9 +319,15 @@ const notifyNewMessage = async (conversation, sender, message) => {
         title: 'Nouveau message',
         message: preview,
         category: 'messages',
+        conversationId: conversation._id,
       });
     } else if (sender.role === 'apprenant') {
-      await notificationService.notifyAdmins('Nouveau message de support', preview, 'messages');
+      await notificationService.notifyAdmins(
+        'Nouveau message de support',
+        preview,
+        'messages',
+        conversation._id
+      );
     } else if (sender.role === 'admin') {
       await notificationService.createNotification({
         role: 'apprenant',
@@ -274,6 +335,7 @@ const notifyNewMessage = async (conversation, sender, message) => {
         title: 'Réponse du support',
         message: preview,
         category: 'messages',
+        conversationId: conversation._id,
       });
     }
   } catch (error) {
@@ -281,9 +343,12 @@ const notifyNewMessage = async (conversation, sender, message) => {
   }
 };
 
-const createMessage = async (conversation, sender, content, clientMessageId) => {
+const createMessage = async (conversation, sender, content, clientMessageId, attachments = []) => {
   const trimmedContent = typeof content === 'string' ? content.trim() : '';
-  if (!trimmedContent) throw createError(400, 'content est obligatoire');
+  const validAttachments = await resolveMessageAttachments(conversation, sender, attachments);
+  if (!trimmedContent && validAttachments.length === 0) {
+    throw createError(400, 'content ou attachments est obligatoire');
+  }
   if (trimmedContent.length > 5000) throw createError(400, 'content ne doit pas dépasser 5000 caractères');
   if (conversation.type === 'support' && conversation.status === 'closed') {
     throw createError(409, 'Cette conversation est fermée');
@@ -309,6 +374,7 @@ const createMessage = async (conversation, sender, content, clientMessageId) => 
       senderId,
       senderRole,
       content: trimmedContent,
+      attachments: validAttachments,
     };
     if (clientMessageId) messagePayload.clientMessageId = clientMessageId;
     message = await Message.create(messagePayload);
@@ -330,11 +396,16 @@ const createMessage = async (conversation, sender, content, clientMessageId) => 
     const admins = await User.find({ role: 'admin', status: 'active' }).select('_id').lean();
     recipientIds.push(...admins.map((admin) => userIdString(admin._id)));
   }
+
+  const previewText = validAttachments.length > 0 && !trimmedContent
+    ? (validAttachments[0].originalName || 'Document joint')
+    : (trimmedContent || 'Nouveau message');
+
   const unreadUpdate = { $set: {
     lastMessage: {
       messageId: message._id,
       senderId,
-      contentPreview: trimmedContent.slice(0, 200),
+      contentPreview: previewText.slice(0, 200),
       createdAt: message.createdAt,
     },
     lastMessageAt: message.createdAt,
@@ -351,12 +422,12 @@ const createMessage = async (conversation, sender, content, clientMessageId) => 
   return { message, duplicate: false };
 };
 
-const sendMessage = async (conversationId, user, content, clientMessageId) => {
+const sendMessage = async (conversationId, user, content, clientMessageId, attachments = []) => {
   const conversation = await findAccessibleConversation(conversationId, user);
   if (user.role === 'centre' && conversation.type !== 'direct') {
     throw createError(403, 'Accès interdit');
   }
-  return createMessage(conversation, user, content, clientMessageId);
+  return createMessage(conversation, user, content, clientMessageId, attachments);
 };
 
 const updateSupportStatus = async (conversationId, status, user) => {

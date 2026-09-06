@@ -81,7 +81,10 @@ const conversationSchema = new mongoose.Schema(
 );
 
 conversationSchema.index({ directKey: 1 }, { unique: true, sparse: true });
-conversationSchema.index({ activeSupportKey: 1 }, { unique: true, sparse: true });
+conversationSchema.index(
+  { activeSupportKey: 1 },
+  { unique: true, partialFilterExpression: { activeSupportKey: { $type: 'string' } } }
+);
 conversationSchema.index({ learnerUserId: 1, lastMessageAt: -1 });
 conversationSchema.index({ centreUserId: 1, lastMessageAt: -1 });
 conversationSchema.index({ type: 1, status: 1, lastMessageAt: -1 });

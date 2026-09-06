@@ -25,7 +25,8 @@ const sendMessage = (req, res, next) => send(
     req.params.id,
     req.user,
     req.body.content,
-    req.body.clientMessageId
+    req.body.clientMessageId,
+    req.body.attachments
   ),
   res,
   next,

@@ -56,6 +56,12 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Conversation',
+      default: null,
+      index: true,
+    },
     lu: {
       type: Boolean,
       default: false,

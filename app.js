@@ -20,6 +20,7 @@ var signalementRouter = require('./src/routes/signalementRoutes');
 var litigeRouter = require('./src/routes/litigeRoutes');
 var dashboardRouter = require('./src/routes/dashboardRoutes');
 var messagingRouter = require('./src/routes/messagingRoutes');
+var attachmentRouter = require('./src/routes/attachmentRoutes');
 var errorMiddleware = require('./src/middleware/errorMiddleware');
 var logMiddleware = require('./src/middleware/logMiddleware');
 var emailService = require('./src/services/emailService');
@@ -65,6 +66,7 @@ app.use('/api/notifications', notificationRouter);
 app.use('/api/signalements', signalementRouter);
 app.use('/api/litiges', litigeRouter);
 app.use('/api/admin/dashboard', dashboardRouter);
+app.use('/api/conversations', attachmentRouter);
 app.use('/api/conversations', messagingRouter);
 
 app.use(function(req, res, next) {

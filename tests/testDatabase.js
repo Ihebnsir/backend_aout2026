@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 let mongoServer;
 
 const connectTestDatabase = async () => {
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
+  process.env.JWT_SECRET = 'test-secret-key';
 
   if (!mongoServer) {
     mongoServer = await MongoMemoryServer.create();
