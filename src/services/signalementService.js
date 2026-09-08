@@ -5,6 +5,8 @@ const User = require('../models/User');
 const Formation = require('../models/Formation');
 const Centre = require('../models/Centre');
 const Message = require('../models/Message');
+const notificationService = require('./notificationService');
+const litigeService = require('./litigeService');
 
 const sanitizeSignalement = (signalement) => {
   if (!signalement) return null;
@@ -49,6 +51,22 @@ const validateTarget = async (cibleType, cibleId) => {
   return target._id;
 };
 
+const notifyReporter = async (reporter, title, message) => {
+  if (!reporter || reporter.role === 'admin') return;
+
+  try {
+    await notificationService.createNotification({
+      role: reporter.role,
+      userId: reporter._id,
+      title,
+      message,
+      category: 'signalements',
+    });
+  } catch (error) {
+    // Notifications are best effort and must not block moderation actions.
+  }
+};
+
 const createSignalement = async (reporterId, { type, contenu, cibleType, cibleId }) => {
   // Vérifier que le reporter existe
   const reporter = await User.findById(reporterId);
@@ -69,14 +87,36 @@ const createSignalement = async (reporterId, { type, contenu, cibleType, cibleId
 
   await signalement.populate('reporter', 'nom prenom email');
 
+  await notifyReporter(
+    reporter,
+    'Signalement enregistré',
+    `Votre signalement ${signalement._id} a bien été enregistré.`
+  );
+
+  if (reporter.role !== 'admin') {
+    try {
+      await notificationService.notifyAdmins(
+        'Nouveau signalement',
+        `Un nouveau signalement a été créé (${signalement._id}).`,
+        'signalements'
+      );
+    } catch (error) {
+      // Notifications are best effort and must not block report creation.
+    }
+  }
+
   return sanitizeSignalement(signalement);
 };
 
-const listSignalements = async ({ page = 1, limit = 10, type, status, sortOrder = 'desc' } = {}) => {
+const listSignalements = async ({ reporter, page = 1, limit = 10, type, status, sortOrder = 'desc' } = {}) => {
   const normalizedLimit = Math.max(1, Number(limit));
   const normalizedPage = Math.max(1, Number(page));
 
   const filter = {};
+
+  if (reporter) {
+    filter.reporter = reporter;
+  }
 
   if (type) {
     filter.type = type;
@@ -138,8 +178,14 @@ const updateSignalementStatus = async (signalementId, newStatus, adminId, resolu
       resolutionNote: resolutionNote || null,
     },
     { new: true, runValidators: true }
-  ).populate('reporter', 'nom prenom email')
+  ).populate('reporter', 'nom prenom email role')
   .populate('traitePar', 'nom prenom email');
+
+  await notifyReporter(
+    updated.reporter,
+    newStatus === 'Résolu' ? 'Signalement résolu' : 'Signalement mis à jour',
+    `Votre signalement ${signalementId} est maintenant « ${newStatus} ».`
+  );
 
   return sanitizeSignalement(updated);
 };
@@ -176,10 +222,11 @@ const escaladerSignalement = async (signalementId, adminId, overrides = {}) => {
   const Formation = require('../models/Formation');
   const Centre = require('../models/Centre');
   const Reservation = require('../models/Reservation');
-  const resolvedFormationId = overrides.formationId
-    || (signalement.cibleType === 'formation' ? signalement.cibleId : null);
-  const formation = resolvedFormationId ? await Formation.findById(resolvedFormationId).lean() : null;
   const reservation = overrides.reservationId ? await Reservation.findById(overrides.reservationId).lean() : null;
+  const resolvedFormationId = overrides.formationId
+    || (signalement.cibleType === 'formation' ? signalement.cibleId : null)
+    || reservation?.formationId;
+  const formation = resolvedFormationId ? await Formation.findById(resolvedFormationId).lean() : null;
   const centreId = overrides.centreId
     || formation?.centre
     || reservation?.centreId
@@ -201,6 +248,13 @@ const escaladerSignalement = async (signalementId, adminId, overrides = {}) => {
   if (missingFields.length) {
     throw createError(400, `Champs manquants pour l'escalade : ${missingFields.join(', ')}`);
   }
+
+  await litigeService.validateLitigeRelationships({
+    etudiant: etudiantId,
+    centre: centreId,
+    formation: formationId,
+    reservation: reservationId,
+  });
 
   const student = await User.findById(etudiantId).lean();
   if (!student) {
@@ -267,6 +321,12 @@ const escaladerSignalement = async (signalementId, adminId, overrides = {}) => {
     status: 'En cours',
     traitePar: adminId,
   });
+
+  await notifyReporter(
+    signalement.reporter,
+    'Signalement escaladé',
+    `Votre signalement ${signalementId} a été transmis au service des litiges.`
+  );
 
   await litige.populate([
     { path: 'etudiant', select: 'nom prenom email' },

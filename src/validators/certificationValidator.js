@@ -1,4 +1,4 @@
-const { body, validationResult, param } = require('express-validator');
+const { body, validationResult, param, query } = require('express-validator');
 
 const createCertificationRules = [
   body('apprenantId').isMongoId().withMessage('apprenantId invalide'),
@@ -9,6 +9,12 @@ const createCertificationRules = [
 
 const verifyCertificationRules = [
   param('numeroCertificat').trim().notEmpty().withMessage('numeroCertificat obligatoire'),
+];
+
+const listCertificationRules = [
+  query('page').optional().isInt({ min: 1 }).withMessage('page doit être >= 1'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('limit doit être entre 1 et 100'),
+  query('status').optional().isIn(['emise', 'revoquee']).withMessage('status invalide'),
 ];
 
 const validateRequest = (req, res, next) => {
@@ -26,5 +32,6 @@ const validateRequest = (req, res, next) => {
 module.exports = {
   createCertificationRules,
   verifyCertificationRules,
+  listCertificationRules,
   validateRequest,
 };

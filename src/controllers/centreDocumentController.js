@@ -57,6 +57,16 @@ const getMyDocuments = async (req, res, next) => {
   }
 };
 
+const getAdminDocuments = async (req, res, next) => {
+  try {
+    const { page, limit, status, type, centre } = req.query;
+    const result = await centreDocumentService.getAdminDocuments({ page, limit, status, type, centre });
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const getDocumentById = async (req, res, next) => {
   try {
     ensureId(req.params.id);
@@ -101,7 +111,9 @@ const rejectDocument = async (req, res, next) => {
   try {
     ensureId(req.params.id);
 
-    const { commentaireAdmin = '' } = req.body;
+    const commentaireAdmin = typeof req.body.commentaireAdmin === 'string'
+      ? req.body.commentaireAdmin.trim()
+      : '';
 
     if (!commentaireAdmin) {
       throw createError(400, 'commentaireAdmin est obligatoire');
@@ -149,6 +161,7 @@ const deleteDocument = async (req, res, next) => {
 module.exports = {
   uploadDocument,
   getMyDocuments,
+  getAdminDocuments,
   getDocumentById,
   validateDocument,
   rejectDocument,

@@ -45,8 +45,8 @@ certificationSchema.pre('validate', async function preValidate() {
 
 });
 
-// Index composé pour vérification
-certificationSchema.index({ apprenant: 1, formation: 1, centre: 1 });
+// Un apprenant ne peut recevoir qu'un certificat par formation.
+certificationSchema.index({ apprenant: 1, formation: 1 }, { unique: true });
 certificationSchema.index({ numeroCertificat: 1, status: 1 });
 
 module.exports = mongoose.model('Certification', certificationSchema);

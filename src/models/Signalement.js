@@ -28,7 +28,7 @@ const signalementSchema = new mongoose.Schema(
     },
     cibleType: {
       type: String,
-      enum: ['formation', 'centre', 'commentaire', 'message', 'autre'],
+      enum: ['formation', 'centre', 'message', 'autre'],
       default: 'autre',
     },
     cibleId: {

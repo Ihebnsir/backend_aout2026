@@ -28,7 +28,7 @@ const createSignalementRules = [
 
   body('cibleType')
     .optional()
-    .isIn(['formation', 'centre', 'commentaire', 'message', 'autre'])
+    .isIn(['formation', 'centre', 'message', 'autre'])
     .withMessage('cibleType invalide')
     .bail()
     .custom((value, { req }) => {

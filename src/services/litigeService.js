@@ -51,15 +51,17 @@ const validateStatusTransition = (currentStatus, newStatus) => {
   }
 };
 
-const createLitige = async (adminId, { titre, description, categorie, priorite, etudiant, centre, formation, reservation }) => {
-  // Vérifier les références
-  const etudiantDoc = await User.findById(etudiant);
+const validateLitigeRelationships = async ({ etudiant, centre, formation, reservation }) => {
+  const etudiantDoc = await User.findById(etudiant).lean();
   if (!etudiantDoc) {
     throw createError(404, 'Étudiant introuvable');
   }
+  if (etudiantDoc.role !== 'apprenant') {
+    throw createError(400, 'etudiant doit être un apprenant');
+  }
 
   const Centre = require('../models/Centre');
-  const centreDoc = await Centre.findById(centre);
+  const centreDoc = await Centre.findById(centre).lean();
   if (!centreDoc) {
     throw createError(404, 'Centre introuvable');
   }
@@ -77,10 +79,21 @@ const createLitige = async (adminId, { titre, description, categorie, priorite, 
     const Reservation = require('../models/Reservation');
     const reservationDoc = await Reservation.findById(reservation).lean();
     if (!reservationDoc) throw createError(404, 'Réservation introuvable');
-    if (reservationDoc.learnerId.toString() !== etudiant.toString() || reservationDoc.centreId.toString() !== centre.toString()) {
+    if (reservationDoc.learnerId.toString() !== etudiant.toString()
+      || reservationDoc.centreId.toString() !== centre.toString()) {
       throw createError(400, 'La réservation ne correspond pas à l’étudiant et au centre');
     }
+    if (formation && reservationDoc.formationId.toString() !== formation.toString()) {
+      throw createError(400, 'La réservation ne correspond pas à la formation');
+    }
+    return reservationDoc.formationId;
   }
+
+  return formation || null;
+};
+
+const createLitige = async (adminId, { titre, description, categorie, priorite, etudiant, centre, formation, reservation }) => {
+  const resolvedFormation = await validateLitigeRelationships({ etudiant, centre, formation, reservation });
 
   // Générer le numéro de dossier
   const litigesCount = await Litige.countDocuments();
@@ -97,7 +110,7 @@ const createLitige = async (adminId, { titre, description, categorie, priorite, 
       priorite,
       etudiant,
       centre,
-      formation: formation || null,
+      formation: resolvedFormation || null,
       reservation: reservation || null,
       statut: 'ouvert',
       historique: [
@@ -169,6 +182,9 @@ const listLitiges = async ({ page = 1, limit = 10, statut, priorite, categorie }
 };
 
 const listMesLitiges = async (userId, userRole, { page = 1, limit = 10 } = {}) => {
+  if (!['apprenant', 'centre'].includes(userRole)) {
+    throw createError(403, 'Accès interdit');
+  }
   const normalizedLimit = Math.max(1, Number(limit));
   const normalizedPage = Math.max(1, Number(page));
 
@@ -205,6 +221,9 @@ const listMesLitiges = async (userId, userRole, { page = 1, limit = 10 } = {}) =
 };
 
 const findLitigeById = async (litigeId, userRole = 'admin', userId = null) => {
+  if (!['admin', 'apprenant', 'centre'].includes(userRole)) {
+    throw createError(403, 'Accès interdit');
+  }
   const litige = await Litige.findById(litigeId).populate([
     { path: 'etudiant', select: 'nom prenom email' },
     { path: 'centre', select: 'name email' },
@@ -217,11 +236,11 @@ const findLitigeById = async (litigeId, userRole = 'admin', userId = null) => {
   }
 
   // Vérifier l'accès pour centre/apprenant
-  if (userRole === 'apprenant' && litige.etudiant._id.toString() !== userId.toString()) {
+  if (userRole === 'apprenant' && (!userId || litige.etudiant._id.toString() !== userId.toString())) {
     throw createError(403, 'Accès interdit');
   }
 
-  if (userRole === 'centre' && litige.centre._id.toString() !== userId.toString()) {
+  if (userRole === 'centre' && (!userId || litige.centre._id.toString() !== userId.toString())) {
     throw createError(403, 'Accès interdit');
   }
 
@@ -265,6 +284,9 @@ const updateLitigeStatus = async (litigeId, newStatus) => {
 };
 
 const ajouterMessageConversation = async (litigeId, auteurId, userRole, message, centreId = null) => {
+  if (!['admin', 'apprenant', 'centre'].includes(userRole)) {
+    throw createError(403, 'Accès interdit');
+  }
   const litige = await Litige.findById(litigeId);
 
   if (!litige) {
@@ -305,6 +327,9 @@ const ajouterMessageConversation = async (litigeId, auteurId, userRole, message,
 };
 
 const ajouterPieceJointe = async (litigeId, auteurId, userRole, piece, centreId = null) => {
+  if (!['admin', 'apprenant', 'centre'].includes(userRole)) {
+    throw createError(403, 'Accès interdit');
+  }
   const litige = await Litige.findById(litigeId);
 
   if (!litige) throw createError(404, 'Litige introuvable');
@@ -313,6 +338,10 @@ const ajouterPieceJointe = async (litigeId, auteurId, userRole, piece, centreId 
   }
   if (userRole === 'centre' && (!centreId || litige.centre.toString() !== centreId.toString())) {
     throw createError(403, 'Accès interdit');
+  }
+
+  if (!litige.piecesJointes) {
+    litige.piecesJointes = [];
   }
 
   litige.piecesJointes.push({
@@ -374,6 +403,9 @@ const assignerResponsable = async (litigeId, responsableId) => {
   const responsable = await User.findById(responsableId);
   if (!responsable) {
     throw createError(404, 'Responsable introuvable');
+  }
+  if (responsable.role !== 'admin' || responsable.status !== 'active') {
+    throw createError(400, 'Le responsable doit être un administrateur actif');
   }
 
   // Ajouter à l'historique
@@ -523,6 +555,7 @@ const getStatsCentre = async (centreId) => {
 
 module.exports = {
   createLitige,
+  validateLitigeRelationships,
   listLitiges,
   listMesLitiges,
   findLitigeById,

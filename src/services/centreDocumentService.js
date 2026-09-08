@@ -10,6 +10,14 @@ const sanitizeDocument = (doc) => {
   return docObj;
 };
 
+const getExistingDocument = async (documentId) => {
+  const document = await CentreDocument.findById(documentId).lean();
+  if (!document) throw createError(404, 'Document introuvable');
+  const centre = await Centre.findById(document.centre).lean();
+  if (!centre) throw createError(404, 'Centre associé au document introuvable');
+  return { document, centre };
+};
+
 const createDocument = async (centreId, { type, fileUrl }) => {
   const document = await CentreDocument.create({
     centre: centreId,
@@ -68,6 +76,33 @@ const getDocumentsBycentre = async (centreId, { page = 1, limit = 10, status } =
   };
 };
 
+const getAdminDocuments = async ({ page = 1, limit = 10, status, type, centre } = {}) => {
+  const normalizedLimit = Math.min(100, Math.max(1, Number(limit) || 10));
+  const normalizedPage = Math.max(1, Number(page) || 1);
+  const filter = {};
+  if (status) filter.status = status;
+  if (type) filter.type = type;
+  if (centre) filter.centre = centre;
+
+  const total = await CentreDocument.countDocuments(filter);
+  const documents = await CentreDocument.find(filter)
+    .populate('centre', 'name email')
+    .sort({ uploadedAt: -1 })
+    .skip((normalizedPage - 1) * normalizedLimit)
+    .limit(normalizedLimit)
+    .lean();
+
+  return {
+    data: documents.map(sanitizeDocument),
+    pagination: {
+      page: normalizedPage,
+      limit: normalizedLimit,
+      total,
+      pages: Math.max(1, Math.ceil(total / normalizedLimit)),
+    },
+  };
+};
+
 const getDocumentById = async (documentId) => {
   const document = await CentreDocument.findById(documentId)
     .populate('centre', 'name email')
@@ -81,22 +116,19 @@ const getDocumentById = async (documentId) => {
 };
 
 const validateDocument = async (documentId, { commentaireAdmin } = {}) => {
+  const { document: existing, centre } = await getExistingDocument(documentId);
+  if (existing.status !== 'en_attente') {
+    throw createError(409, 'Seuls les documents en attente peuvent être validés');
+  }
+
   const document = await CentreDocument.findByIdAndUpdate(
     documentId,
-    {
-      status: 'valide',
-      commentaireAdmin: commentaireAdmin || '',
-    },
+    { status: 'valide', commentaireAdmin: commentaireAdmin || '' },
     { new: true, runValidators: true }
   ).lean();
 
-  if (!document) {
-    throw createError(404, 'Document introuvable');
-  }
-
   try {
-    const centre = await Centre.findById(document.centre).lean();
-    if (centre && centre.userId) {
+    if (centre.userId) {
       await notificationService.createNotification({
         role: 'centre',
         userId: centre.userId,
@@ -113,6 +145,11 @@ const validateDocument = async (documentId, { commentaireAdmin } = {}) => {
 };
 
 const rejectDocument = async (documentId, { commentaireAdmin = '' }) => {
+  const { document: existing, centre } = await getExistingDocument(documentId);
+  if (existing.status !== 'en_attente') {
+    throw createError(409, 'Seuls les documents en attente peuvent être rejetés');
+  }
+
   const document = await CentreDocument.findByIdAndUpdate(
     documentId,
     {
@@ -127,8 +164,7 @@ const rejectDocument = async (documentId, { commentaireAdmin = '' }) => {
   }
 
   try {
-    const centre = await Centre.findById(document.centre).lean();
-    if (centre && centre.userId) {
+    if (centre.userId) {
       await notificationService.createNotification({
         role: 'centre',
         userId: centre.userId,
@@ -157,6 +193,7 @@ const deleteDocument = async (documentId) => {
 module.exports = {
   createDocument,
   getDocumentsBycentre,
+  getAdminDocuments,
   getDocumentById,
   validateDocument,
   rejectDocument,

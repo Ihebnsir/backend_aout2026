@@ -13,6 +13,14 @@ const sanitizeCertification = (cert) => {
   return certObj;
 };
 
+const sanitizePublicCertification = (cert) => {
+  const sanitized = sanitizeCertification(cert);
+  if (sanitized?.apprenant && typeof sanitized.apprenant === 'object') {
+    delete sanitized.apprenant.email;
+  }
+  return sanitized;
+};
+
 const isReservationCompleted = async (formationId, apprenantId, centreId) => {
   const reservation = await Reservation.findOne({
     formationId,
@@ -54,12 +62,20 @@ const createCertification = async (apprenantId, formationId, centreId, dateObten
     throw createError(409, 'Certification déjà émise pour cette formation');
   }
 
-  const certification = await Certification.create({
-    apprenant: apprenantId,
-    formation: formationId,
-    centre: centreId,
-    dateObtention,
-  });
+  let certification;
+  try {
+    certification = await Certification.create({
+      apprenant: apprenantId,
+      formation: formationId,
+      centre: centreId,
+      dateObtention,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      throw createError(409, 'Certification déjà émise pour cette formation');
+    }
+    throw error;
+  }
 
   try {
     await notificationService.createNotification({
@@ -110,7 +126,7 @@ const verifyCertification = async (numeroCertificat) => {
     numeroCertificat,
     status: 'emise',
   })
-    .populate('apprenant', 'nom prenom email')
+    .populate('apprenant', 'nom prenom')
     .populate('formation', 'title')
     .populate('centre', 'name')
     .lean();
@@ -119,7 +135,7 @@ const verifyCertification = async (numeroCertificat) => {
     throw createError(404, 'Certificat introuvable ou révoqué');
   }
 
-  return sanitizeCertification(certification);
+  return sanitizePublicCertification(certification);
 };
 
 const getCertificationById = async (certificationId) => {
@@ -137,15 +153,21 @@ const getCertificationById = async (certificationId) => {
 };
 
 const revokeCertification = async (certificationId) => {
+  const existing = await Certification.findById(certificationId).lean();
+
+  if (!existing) {
+    throw createError(404, 'Certification introuvable');
+  }
+
+  if (existing.status === 'revoquee') {
+    throw createError(409, 'Certification déjà révoquée');
+  }
+
   const certification = await Certification.findByIdAndUpdate(
     certificationId,
     { status: 'revoquee' },
     { new: true, runValidators: true }
   ).lean();
-
-  if (!certification) {
-    throw createError(404, 'Certification introuvable');
-  }
 
   return sanitizeCertification(certification);
 };

@@ -15,6 +15,9 @@ const {
 // POST /api/signalements - Créer un signalement (tout rôle)
 router.post('/', authenticate, createSignalementRules, validateRequest, signalementController.createSignalement);
 
+// GET /api/signalements/mine - Lister ses signalements
+router.get('/mine', authenticate, requireRole('apprenant', 'centre'), listSignalementsRules, validateRequest, signalementController.listMySignalements);
+
 // GET /api/signalements - Lister les signalements (admin)
 router.get('/', authenticate, requireRole('admin'), listSignalementsRules, validateRequest, signalementController.listSignalements);
 

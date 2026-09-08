@@ -24,10 +24,10 @@ router.get('/', authenticate, requireRole('admin'), listLitigesRules, validateRe
 
 // GET /api/litiges/me - Lister mes litiges (apprenant/centre)
 // IMPORTANT: /me doit être AVANT /:id pour ne pas être interprété comme un ID
-router.get('/me', authenticate, litigeController.getMesLitiges);
+router.get('/me', authenticate, requireRole('apprenant', 'centre'), litigeController.getMesLitiges);
 
 // GET /api/litiges/:id - Consulter un litige
-router.get('/:id', authenticate, litigeController.getLitigeById);
+router.get('/:id', authenticate, requireRole('admin', 'apprenant', 'centre'), litigeController.getLitigeById);
 
 // PATCH /api/litiges/:id/status - Changer le statut (admin)
 router.patch('/:id/status', authenticate, requireRole('admin'), updateLitigeStatusRules, validateRequest, litigeController.updateLitigeStatus);
@@ -36,10 +36,10 @@ router.patch('/:id/status', authenticate, requireRole('admin'), updateLitigeStat
 router.patch('/:id/assign', authenticate, requireRole('admin'), assignerResponsableRules, validateRequest, litigeController.assignerResponsable);
 
 // POST /api/litiges/:id/messages - Ajouter un message
-router.post('/:id/messages', authenticate, ajouterMessageRules, validateRequest, litigeController.ajouterMessage);
+router.post('/:id/messages', authenticate, requireRole('admin', 'apprenant', 'centre'), ajouterMessageRules, validateRequest, litigeController.ajouterMessage);
 
 // POST /api/litiges/:id/pieces-jointes - Ajouter une pièce jointe
-router.post('/:id/pieces-jointes', authenticate, ajouterPieceJointeRules, validateRequest, litigeController.ajouterPieceJointe);
+router.post('/:id/pieces-jointes', authenticate, requireRole('admin', 'apprenant', 'centre'), ajouterPieceJointeRules, validateRequest, litigeController.ajouterPieceJointe);
 
 // POST /api/litiges/:id/notes - Ajouter une note interne (admin)
 router.post('/:id/notes', authenticate, requireRole('admin'), ajouterNoteRules, validateRequest, litigeController.ajouterNote);

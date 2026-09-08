@@ -139,9 +139,34 @@ const ajouterNoteRules = [
 const ajouterPieceJointeRules = [
   param('id').isMongoId().withMessage('ID invalide'),
   body('nom').trim().notEmpty().withMessage('nom est obligatoire').isLength({ max: 255 }),
-  body('type').trim().notEmpty().withMessage('type est obligatoire').isLength({ max: 100 }),
-  body('url').trim().notEmpty().withMessage('url est obligatoire').isLength({ max: 2000 }),
-  body('taille').optional().isLength({ max: 50 }).withMessage('taille invalide'),
+  body('type')
+    .trim()
+    .notEmpty()
+    .withMessage('type est obligatoire')
+    .isMimeType()
+    .withMessage('type MIME invalide'),
+  body('url')
+    .trim()
+    .notEmpty()
+    .withMessage('url est obligatoire')
+    .isLength({ max: 2000 })
+    .withMessage('url invalide')
+    .custom((value) => {
+      let parsed;
+      try {
+        parsed = new URL(value);
+      } catch (error) {
+        throw new Error('url invalide');
+      }
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new Error('url invalide');
+      }
+      return true;
+    }),
+  body('taille')
+    .optional()
+    .isInt({ min: 1, max: 52428800 })
+    .withMessage('taille invalide'),
 ];
 
 const cloturerLitigeRules = [

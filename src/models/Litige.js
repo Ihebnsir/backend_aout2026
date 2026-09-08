@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+const pieceJointeSchema = new mongoose.Schema(
+  {
+    nom: String,
+    type: String,
+    url: String,
+    taille: String,
+    uploadedAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 const litigeSchema = new mongoose.Schema(
   {
     numeroDossier: {
@@ -81,15 +92,7 @@ const litigeSchema = new mongoose.Schema(
       default: null,
       immutable: true,
     },
-    piecesJointes: [
-      {
-        nom: String,
-        type: String,
-        url: String,
-        taille: String,
-        uploadedAt: { type: Date, default: Date.now },
-      },
-    ],
+    piecesJointes: { type: [pieceJointeSchema], default: [] },
     conversation: [
       {
         auteur: {

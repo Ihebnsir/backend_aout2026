@@ -52,6 +52,24 @@ const listSignalements = async (req, res, next) => {
   }
 };
 
+// GET /api/signalements/mine - Lister ses signalements
+const listMySignalements = async (req, res, next) => {
+  try {
+    const { page, limit, type, status } = req.query;
+    const result = await signalementService.listSignalements({
+      reporter: req.user.id,
+      page,
+      limit,
+      type,
+      status,
+    });
+
+    return res.status(200).json({ success: true, ...result });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 // GET /api/signalements/:id - Consulter un signalement (admin)
 const getSignalementById = async (req, res, next) => {
   try {
@@ -135,6 +153,7 @@ const deleteSignalement = async (req, res, next) => {
 module.exports = {
   createSignalement,
   listSignalements,
+  listMySignalements,
   getSignalementById,
   updateSignalementStatus,
   escaladerSignalement,
