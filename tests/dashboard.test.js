@@ -1,8 +1,12 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { expect } = require('chai');
 const app = require('../app');
 const User = require('../src/models/User');
+const Centre = require('../src/models/Centre');
+const Formation = require('../src/models/Formation');
+const Reservation = require('../src/models/Reservation');
 const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 let adminToken;
@@ -118,5 +122,28 @@ describe('Admin dashboard API', () => {
       const response = await request(app).get(endpoint).set('Authorization', `Bearer ${adminToken}`);
       expect(response.status, endpoint).to.equal(400);
     }
+  });
+
+  it('should count confirmed reservations as in progress', async () => {
+    const centreUser = await User.findOne({ email: 'dashboard.centre@test.com' });
+    const centre = await Centre.create({ userId: centreUser._id, name: 'Dashboard Centre' });
+    const formation = await Formation.create({
+      centre: centre._id,
+      title: 'Dashboard Formation',
+      price: 100,
+      duration: '1 jour',
+    });
+    const learner = await User.findOne({ email: 'dashboard.learner@test.com' });
+    await Reservation.create([
+      { learnerId: learner._id, formationId: formation._id, centreId: centre._id, price: 100, status: 'PENDING' },
+      { learnerId: learner._id, formationId: new mongoose.Types.ObjectId(), centreId: centre._id, price: 100, status: 'CONFIRMED' },
+    ]);
+
+    const response = await request(app)
+      .get('/api/admin/dashboard/overview')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(response.status).to.equal(200);
+    expect(response.body.data.reservations.enCours).to.equal(1);
   });
 });

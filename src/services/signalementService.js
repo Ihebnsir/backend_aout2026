@@ -2,6 +2,9 @@ const createError = require('http-errors');
 const mongoose = require('mongoose');
 const Signalement = require('../models/Signalement');
 const User = require('../models/User');
+const Formation = require('../models/Formation');
+const Centre = require('../models/Centre');
+const Message = require('../models/Message');
 
 const sanitizeSignalement = (signalement) => {
   if (!signalement) return null;
@@ -27,6 +30,25 @@ const validateStatusTransition = (currentStatus, newStatus) => {
   }
 };
 
+const validateTarget = async (cibleType, cibleId) => {
+  if (!cibleId || cibleType === 'autre') {
+    if (cibleId && cibleType === 'autre') throw createError(400, 'cibleId invalide pour ce type de cible');
+    return null;
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(cibleId)) {
+    throw createError(400, 'cibleId invalide');
+  }
+
+  const targetModels = { formation: Formation, centre: Centre, message: Message };
+  const Target = targetModels[cibleType];
+  if (!Target) throw createError(400, 'Type de cible non pris en charge');
+
+  const target = await Target.findById(cibleId).select('_id').lean();
+  if (!target) throw createError(404, 'Cible introuvable');
+  return target._id;
+};
+
 const createSignalement = async (reporterId, { type, contenu, cibleType, cibleId }) => {
   // Vérifier que le reporter existe
   const reporter = await User.findById(reporterId);
@@ -34,12 +56,14 @@ const createSignalement = async (reporterId, { type, contenu, cibleType, cibleId
     throw createError(404, 'Reporter introuvable');
   }
 
+  const targetId = await validateTarget(cibleType || 'autre', cibleId);
+
   const signalement = await Signalement.create({
     type,
     contenu,
     reporter: reporterId,
     cibleType: cibleType || 'autre',
-    cibleId: cibleId || null,
+    cibleId: targetId || null,
     status: 'En attente',
   });
 

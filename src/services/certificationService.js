@@ -1,5 +1,8 @@
 const Certification = require('../models/Certification');
 const Reservation = require('../models/Reservation');
+const Formation = require('../models/Formation');
+const Centre = require('../models/Centre');
+const User = require('../models/User');
 const notificationService = require('./notificationService');
 const createError = require('http-errors');
 
@@ -10,10 +13,11 @@ const sanitizeCertification = (cert) => {
   return certObj;
 };
 
-const isReservationCompleted = async (formationId, apprenantId) => {
+const isReservationCompleted = async (formationId, apprenantId, centreId) => {
   const reservation = await Reservation.findOne({
     formationId,
     learnerId: apprenantId,
+    centreId,
     status: 'COMPLETED',
   });
 
@@ -21,8 +25,21 @@ const isReservationCompleted = async (formationId, apprenantId) => {
 };
 
 const createCertification = async (apprenantId, formationId, centreId, dateObtention) => {
-  // Vérifier que la formation est terminée
-  const isCompleted = await isReservationCompleted(formationId, apprenantId);
+  const [learner, formation, centre] = await Promise.all([
+    User.findOne({ _id: apprenantId, role: 'apprenant' }).select('_id').lean(),
+    Formation.findById(formationId).select('_id centre').lean(),
+    Centre.findById(centreId).select('_id').lean(),
+  ]);
+
+  if (!learner) throw createError(404, 'Apprenant introuvable');
+  if (!formation) throw createError(404, 'Formation introuvable');
+  if (!centre) throw createError(404, 'Centre introuvable');
+  if (formation.centre.toString() !== centre._id.toString()) {
+    throw createError(400, 'La formation ne correspond pas au centre');
+  }
+
+  // Vérifier qu\'une réservation terminée relie le même apprenant, formation et centre.
+  const isCompleted = await isReservationCompleted(formationId, apprenantId, centreId);
   if (!isCompleted) {
     throw createError(400, 'Réservation non complétée ou introuvable');
   }

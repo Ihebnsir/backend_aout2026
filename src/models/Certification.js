@@ -28,7 +28,7 @@ const certificationSchema = new mongoose.Schema(
 );
 
 // Générer automatiquement un numéro de certificat unique avant sauvegarde
-certificationSchema.pre('save', async function preSave(next) {
+certificationSchema.pre('validate', async function preValidate() {
   if (this.isNew && !this.numeroCertificat) {
     let numeroCertificat;
     let exists = true;
@@ -43,7 +43,6 @@ certificationSchema.pre('save', async function preSave(next) {
     this.numeroCertificat = numeroCertificat;
   }
 
-  next();
 });
 
 // Index composé pour vérification

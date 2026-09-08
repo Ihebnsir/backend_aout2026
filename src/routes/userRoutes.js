@@ -7,7 +7,7 @@ const { createUserRules, updateUserRules, validateRequest } = require('../valida
 
 router.get('/', authenticate, requireRole('admin'), userController.getAllUsers);
 router.get('/:id', authenticate, allowOwnerOrAdmin, userController.getUserById);
-router.post('/', authenticate, createUserRules, validateRequest, userController.createUser);
+router.post('/', authenticate, requireRole('admin'), createUserRules, validateRequest, userController.createUser);
 router.patch('/:id', authenticate, allowOwnerOrAdmin, updateUserRules, validateRequest, userController.updateUser);
 router.delete('/:id', authenticate, requireRole('admin'), userController.deleteUser);
 

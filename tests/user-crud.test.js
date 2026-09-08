@@ -4,6 +4,7 @@ const app = require('../app');
 const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 let token;
+let learnerToken;
 let createdUserId;
 
 before(async function () {
@@ -22,8 +23,19 @@ before(async function () {
     status: 'active'
   });
 
+  const learner = await User.create({
+    nom: 'Learner',
+    prenom: 'Test',
+    email: 'learner-user-crud@test.com',
+    password: 'Password123!',
+    telephone: '0600000001',
+    role: 'apprenant',
+    status: 'active'
+  });
+
   const jwt = require('jsonwebtoken');
   token = jwt.sign({ id: admin._id, role: admin.role }, 'test-secret-key', { expiresIn: '1h' });
+  learnerToken = jwt.sign({ id: learner._id, role: learner.role }, 'test-secret-key', { expiresIn: '1h' });
 });
 
 after(async function () {
@@ -84,6 +96,40 @@ describe('User CRUD API', () => {
     should.not.exist(res.body.data.password);
     should.not.exist(res.body.data.passwordHash);
     createdUserId = res.body.data._id || res.body.data.id;
+  });
+
+  it('POST /api/users should reject non-admin users', async () => {
+    const response = await request(app)
+      .post('/api/users')
+      .set('Authorization', `Bearer ${learnerToken}`)
+      .send({
+        nom: 'Unauthorized',
+        prenom: 'User',
+        email: 'unauthorized-user-crud@test.com',
+        password: 'Password123!',
+      });
+
+    expect(response.status).to.equal(403);
+  });
+
+  it('should accept supported statuses and reject pending', async () => {
+    const suspended = await request(app)
+      .patch(`/api/users/${createdUserId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'suspended' });
+    expect(suspended.status).to.equal(200);
+
+    const banned = await request(app)
+      .patch(`/api/users/${createdUserId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'banned' });
+    expect(banned.status).to.equal(200);
+
+    const pending = await request(app)
+      .patch(`/api/users/${createdUserId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ status: 'pending' });
+    expect(pending.status).to.equal(400);
   });
 
   it('GET /api/users should return paginated list for admin', async () => {

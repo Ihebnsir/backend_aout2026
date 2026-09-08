@@ -136,7 +136,9 @@ const getOverview = async () => {
                   confirmees: {
                     $sum: { $cond: [{ $eq: ['$status', 'CONFIRMED'] }, 1, 0] },
                   },
-                  enCours: { $sum: 0 },
+                  enCours: {
+                    $sum: { $cond: [{ $eq: ['$status', 'CONFIRMED'] }, 1, 0] },
+                  },
                   terminees: {
                     $sum: { $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0] },
                   },

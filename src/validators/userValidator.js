@@ -1,7 +1,7 @@
 const { body, validationResult } = require('express-validator');
 
 const validRoles = ['apprenant', 'centre', 'admin'];
-const validStatuses = ['active', 'inactive', 'pending', 'suspended'];
+const validStatuses = ['active', 'inactive', 'banned', 'suspended'];
 
 const validateRequest = (req, res, next) => {
   const errors = validationResult(req);
