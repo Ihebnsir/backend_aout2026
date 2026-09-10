@@ -35,18 +35,6 @@ const restoreEnvironment = (snapshot) => {
   }
 };
 
-const clearTestCaches = () => {
-  const modulesToClear = [
-    require.resolve('../app'),
-    require.resolve('../src/middleware/authMiddleware'),
-    require.resolve('../src/services/emailService'),
-  ];
-
-  for (const modulePath of modulesToClear) {
-    delete require.cache[modulePath];
-  }
-};
-
 const connectTestDatabase = async () => {
   for (const key of ENV_KEYS_TO_RESTORE) {
     delete process.env[key];
@@ -54,7 +42,6 @@ const connectTestDatabase = async () => {
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-secret-key';
   emailService.resetTransporter();
-  clearTestCaches();
 
   if (!mongoServer) {
     mongoServer = await MongoMemoryServer.create();
@@ -70,19 +57,10 @@ const connectTestDatabase = async () => {
     await mongoose.disconnect().catch(() => undefined);
     await mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 });
   }
-
-  if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-    await mongoose.connection.db.dropDatabase().catch(() => undefined);
-  }
 };
 
 const disconnectTestDatabase = async () => {
-  if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
-    await mongoose.connection.db.dropDatabase().catch(() => undefined);
-  }
-
   emailService.resetTransporter();
-  clearTestCaches();
   for (const key of ENV_KEYS_TO_RESTORE) {
     delete process.env[key];
   }

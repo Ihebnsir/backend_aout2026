@@ -150,13 +150,11 @@ describe('Litige and JWT defect regressions', () => {
   it('fails safely when JWT_SECRET is missing in production mode', () => {
     const originalSecret = process.env.JWT_SECRET;
     const originalNodeEnv = process.env.NODE_ENV;
-    const middlewarePath = require.resolve('../src/middleware/authMiddleware');
 
     try {
       process.env.NODE_ENV = 'production';
       delete process.env.JWT_SECRET;
 
-      delete require.cache[middlewarePath];
       const { authenticate } = require('../src/middleware/authMiddleware');
       let receivedError;
 
@@ -179,9 +177,6 @@ describe('Litige and JWT defect regressions', () => {
         process.env.NODE_ENV = originalNodeEnv;
       }
 
-      delete require.cache[middlewarePath];
-      delete require.cache[require.resolve('../app')];
-      delete require.cache[require.resolve('../src/middleware/authMiddleware')];
     }
   });
 
