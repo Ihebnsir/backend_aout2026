@@ -5,6 +5,7 @@ const centreService = require('../services/centreService');
 const notificationService = require('../services/notificationService');
 const emailService = require('../services/emailService');
 const { getJwtSecret } = require('../middleware/authMiddleware');
+const passwordResetService = require('../services/passwordResetService');
 
 const sanitizeUser = (user) => {
   const sanitizedUser = user.toObject ? user.toObject() : { ...user };
@@ -215,8 +216,47 @@ const me = async (req, res, next) => {
   }
 };
 
+const forgotPassword = async (req, res, next) => {
+  try {
+    const response = await passwordResetService.requestPasswordReset({
+      email: req.body.email,
+      requestIp: passwordResetService.getRequestIp(req),
+    });
+    return res.status(200).json(response);
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const verifyResetCode = async (req, res, next) => {
+  try {
+    const data = await passwordResetService.verifyResetCode({
+      email: req.body.email,
+      code: req.body.code,
+    });
+    return res.status(200).json({ success: true, message: 'Code vérifié', data });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    await passwordResetService.resetPassword({
+      resetToken: req.body.resetToken,
+      newPassword: req.body.newPassword,
+    });
+    return res.status(200).json({ success: true, message: 'Mot de passe réinitialisé avec succès' });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   me,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
 };

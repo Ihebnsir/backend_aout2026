@@ -9,7 +9,8 @@
     "build": "node -e \"console.log('Build successful')\"",
     "migrate:users": "node scripts/migrateUsers.js",
     "seed:admin": "node scripts/seedAdmin.js",
-    "seed:e2e:centre": "node scripts/seedE2ECentre.js"
+    "seed:e2e:centre": "node scripts/seedE2ECentre.js",
+    "seed:e2e:global": "node scripts/seedGlobalE2E.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

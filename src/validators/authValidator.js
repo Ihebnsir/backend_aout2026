@@ -22,6 +22,29 @@ const loginRules = [
   body('password').notEmpty().withMessage('Le mot de passe est obligatoire'),
 ];
 
+const forgotPasswordRules = [
+  body('email').trim().notEmpty().withMessage('L’email est obligatoire').isEmail().withMessage('Email invalide').normalizeEmail(),
+];
+
+const verifyResetCodeRules = [
+  body('email').trim().notEmpty().withMessage('L’email est obligatoire').isEmail().withMessage('Email invalide').normalizeEmail(),
+  body('code').isString().matches(/^\d{6}$/).withMessage('Code invalide'),
+];
+
+const resetPasswordRules = [
+  body('resetToken').isString().notEmpty().withMessage('Le jeton de réinitialisation est obligatoire'),
+  body('newPassword')
+    .isString()
+    .withMessage('Le mot de passe est obligatoire')
+    .isLength({ min: 8 })
+    .withMessage('Le mot de passe doit contenir au moins 8 caractères'),
+  body('confirmPassword')
+    .isString()
+    .withMessage('La confirmation du mot de passe est obligatoire')
+    .custom((value, { req }) => value === req.body.newPassword)
+    .withMessage('Les mots de passe ne correspondent pas'),
+];
+
 const registerRules = [
   body('role').optional().isIn(['apprenant', 'centre']).withMessage('Rôle invalide'),
   body('nom')
@@ -63,5 +86,8 @@ const registerRules = [
 module.exports = {
   loginRules,
   registerRules,
+  forgotPasswordRules,
+  verifyResetCodeRules,
+  resetPasswordRules,
   validateRequest,
 };
