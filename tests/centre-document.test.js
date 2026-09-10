@@ -7,7 +7,7 @@ const User = require('../src/models/User');
 const Centre = require('../src/models/Centre');
 const CentreDocument = require('../src/models/CentreDocument');
 const Notification = require('../src/models/Notification');
-const { connectTestDatabase } = require('./testDatabase');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 const sign = (user) => jwt.sign(
   { id: user._id, role: user.role, email: user.email },
@@ -63,6 +63,11 @@ describe('CentreDocument API', function () {
       { _id: { $in: [centre._id, otherCentre._id] } },
       { $set: { statutVerification: 'EN_ATTENTE', verifie: false, motifRejet: null } }
     );
+  });
+
+  after(async function () {
+    this.timeout(30000);
+    await disconnectTestDatabase();
   });
 
   it('enforces authentication and role access', async () => {

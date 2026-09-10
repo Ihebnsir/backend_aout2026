@@ -2,10 +2,18 @@ const Centre = require('../models/Centre');
 const CentreHistory = require('../models/CentreHistory');
 const notificationService = require('./notificationService');
 
-const sanitizeCentre = (centre) => {
+const sanitizeCentre = (centre, { includeSensitive = false } = {}) => {
   if (!centre) return null;
   const result = centre.toObject ? centre.toObject() : { ...centre };
   delete result.__v;
+
+  if (!includeSensitive) {
+    delete result.userId;
+    delete result.dateDemande;
+    delete result.dateValidation;
+    delete result.motifRejet;
+  }
+
   return result;
 };
 
@@ -29,8 +37,8 @@ const createCentre = async (payload, userId) => {
   return sanitizeCentre(centre);
 };
 
-const findCentreById = async (id) => sanitizeCentre(await Centre.findById(id).lean());
-const findCentreByUserId = async (userId) => sanitizeCentre(await Centre.findOne({ userId }).lean());
+const findCentreById = async (id, { includeSensitive = false } = {}) => sanitizeCentre(await Centre.findById(id).lean(), { includeSensitive });
+const findCentreByUserId = async (userId) => sanitizeCentre(await Centre.findOne({ userId }).lean(), { includeSensitive: true });
 
 const listCentres = async ({ page = 1, limit = 10, ville, domaine, statutVerification } = {}) => {
   const normalizedPage = Math.max(1, Number(page));
@@ -41,7 +49,7 @@ const listCentres = async ({ page = 1, limit = 10, ville, domaine, statutVerific
   if (statutVerification) filter.statutVerification = statutVerification;
   const total = await Centre.countDocuments(filter);
   const centres = await Centre.find(filter).sort({ createdAt: -1 }).skip((normalizedPage - 1) * normalizedLimit).limit(normalizedLimit).lean();
-  return { data: centres.map(sanitizeCentre), pagination: { page: normalizedPage, limit: normalizedLimit, total, pages: Math.max(1, Math.ceil(total / normalizedLimit)) } };
+  return { data: centres.map((centre) => sanitizeCentre(centre, { includeSensitive: false })), pagination: { page: normalizedPage, limit: normalizedLimit, total, pages: Math.max(1, Math.ceil(total / normalizedLimit)) } };
 };
 
 const updateCentre = async (id, payload, actorId) => {

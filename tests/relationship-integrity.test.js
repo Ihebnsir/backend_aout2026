@@ -7,7 +7,7 @@ const User = require('../src/models/User');
 const Centre = require('../src/models/Centre');
 const Formation = require('../src/models/Formation');
 const Reservation = require('../src/models/Reservation');
-const { connectTestDatabase } = require('./testDatabase');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 let adminToken;
 let learner;
@@ -78,6 +78,11 @@ describe('Certification and signalement relationship integrity', function () {
       price: 100,
       status: 'PENDING',
     });
+  });
+
+  after(async function () {
+    this.timeout(30000);
+    await disconnectTestDatabase();
   });
 
   it('creates a certificate for matching learner, formation, centre, and completed reservation', async () => {

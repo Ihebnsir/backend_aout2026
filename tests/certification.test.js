@@ -8,7 +8,7 @@ const Centre = require('../src/models/Centre');
 const Formation = require('../src/models/Formation');
 const Reservation = require('../src/models/Reservation');
 const Certification = require('../src/models/Certification');
-const { connectTestDatabase } = require('./testDatabase');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 const sign = (user) => jwt.sign(
   { id: user._id, role: user.role, email: user.email },
@@ -77,6 +77,11 @@ describe('Certification API', function () {
   beforeEach(async () => {
     await Certification.deleteMany({});
     await Reservation.deleteMany({});
+  });
+
+  after(async function () {
+    this.timeout(30000);
+    await disconnectTestDatabase();
   });
 
   it('protects issuance, listing, detail, and revoke by role', async () => {

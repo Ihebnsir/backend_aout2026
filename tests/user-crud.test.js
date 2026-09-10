@@ -41,10 +41,6 @@ before(async function () {
 after(async function () {
   this.timeout(30000);
 
-  if (mongoose.connection.readyState) {
-    await mongoose.disconnect();
-  }
-
   await disconnectTestDatabase();
 });
 

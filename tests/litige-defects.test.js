@@ -8,7 +8,7 @@ const Litige = require('../src/models/Litige');
 const Centre = require('../src/models/Centre');
 const Formation = require('../src/models/Formation');
 const Reservation = require('../src/models/Reservation');
-const { connectTestDatabase } = require('./testDatabase');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 let admin;
 let learner;
@@ -107,6 +107,11 @@ describe('Litige and JWT defect regressions', () => {
     otherCentreToken = signToken(otherCentreUser);
   });
 
+  after(async function () {
+    this.timeout(30000);
+    await disconnectTestDatabase();
+  });
+
   beforeEach(async () => {
     await Litige.deleteMany({});
   });
@@ -142,28 +147,42 @@ describe('Litige and JWT defect regressions', () => {
     expect(saved.conversation[0].message).to.equal('Message de test');
   });
 
-  it('fails safely when JWT_SECRET is missing', () => {
+  it('fails safely when JWT_SECRET is missing in production mode', () => {
     const originalSecret = process.env.JWT_SECRET;
-    delete process.env.JWT_SECRET;
-
+    const originalNodeEnv = process.env.NODE_ENV;
     const middlewarePath = require.resolve('../src/middleware/authMiddleware');
-    delete require.cache[middlewarePath];
-    const { authenticate } = require('../src/middleware/authMiddleware');
-    let receivedError;
 
-    authenticate({ headers: {} }, {}, (error) => {
-      receivedError = error;
-    });
-
-    expect(receivedError).to.exist;
-    expect(receivedError.status).to.equal(503);
-
-    if (originalSecret === undefined) {
+    try {
+      process.env.NODE_ENV = 'production';
       delete process.env.JWT_SECRET;
-    } else {
-      process.env.JWT_SECRET = originalSecret;
+
+      delete require.cache[middlewarePath];
+      const { authenticate } = require('../src/middleware/authMiddleware');
+      let receivedError;
+
+      authenticate({ headers: {} }, {}, (error) => {
+        receivedError = error;
+      });
+
+      expect(receivedError).to.exist;
+      expect(receivedError.status).to.equal(503);
+    } finally {
+      if (originalSecret === undefined) {
+        delete process.env.JWT_SECRET;
+      } else {
+        process.env.JWT_SECRET = originalSecret;
+      }
+
+      if (originalNodeEnv === undefined) {
+        delete process.env.NODE_ENV;
+      } else {
+        process.env.NODE_ENV = originalNodeEnv;
+      }
+
+      delete require.cache[middlewarePath];
+      delete require.cache[require.resolve('../app')];
+      delete require.cache[require.resolve('../src/middleware/authMiddleware')];
     }
-    delete require.cache[middlewarePath];
   });
 
   it('restricts /me to learners and centres and scopes each participant', async () => {

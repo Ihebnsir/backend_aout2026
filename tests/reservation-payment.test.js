@@ -7,7 +7,7 @@ const User = require('../src/models/User');
 const Formation = require('../src/models/Formation');
 const Reservation = require('../src/models/Reservation');
 const Notification = require('../src/models/Notification');
-const { connectTestDatabase } = require('./testDatabase');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 let learner;
 let otherLearner;
@@ -79,6 +79,11 @@ describe('Reservation payment API', () => {
   beforeEach(async () => {
     await Reservation.deleteMany({});
     await Notification.deleteMany({});
+  });
+
+  after(async function () {
+    this.timeout(30000);
+    await disconnectTestDatabase();
   });
 
   it('allows an authenticated learner to pay their own reservation', async () => {

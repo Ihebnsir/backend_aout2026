@@ -12,6 +12,7 @@ const isConfigured = () => Boolean(
 
 const getTransporter = () => {
   if (!isConfigured()) {
+    transporter = undefined;
     throw new Error('Configuration SMTP incomplète');
   }
 

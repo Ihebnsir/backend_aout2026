@@ -11,7 +11,7 @@ const Signalement = require('../src/models/Signalement');
 const Notification = require('../src/models/Notification');
 const Litige = require('../src/models/Litige');
 const Message = require('../src/models/Message');
-const { connectTestDatabase } = require('./testDatabase');
+const { connectTestDatabase, disconnectTestDatabase } = require('./testDatabase');
 
 const sign = (user) => jwt.sign(
   { id: user._id, role: user.role, email: user.email },
@@ -78,6 +78,11 @@ describe('Signalement API', function () {
       Litige.deleteMany({}),
       Reservation.deleteMany({}),
     ]);
+  });
+
+  after(async function () {
+    this.timeout(30000);
+    await disconnectTestDatabase();
   });
 
   it('allows learner, centre, and admin creation, but rejects unauthenticated creation', async () => {

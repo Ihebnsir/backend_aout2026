@@ -26,26 +26,54 @@ describe('Email service and registration', () => {
   });
 
   it('should keep a successfully created account when SMTP is unavailable', async () => {
-    delete process.env.SMTP_HOST;
-    delete process.env.SMTP_PORT;
-    delete process.env.SMTP_USER;
-    delete process.env.SMTP_PASSWORD;
-    delete process.env.EMAIL_FROM;
+    const originalValues = {
+      SMTP_HOST: process.env.SMTP_HOST,
+      SMTP_PORT: process.env.SMTP_PORT,
+      SMTP_USER: process.env.SMTP_USER,
+      SMTP_PASSWORD: process.env.SMTP_PASSWORD,
+      EMAIL_FROM: process.env.EMAIL_FROM,
+      JWT_SECRET: process.env.JWT_SECRET,
+      NODE_ENV: process.env.NODE_ENV,
+    };
 
-    const email = 'welcome.smtp-failure@test.com';
-    const response = await request(app)
-      .post('/api/auth/register')
-      .send({
-        nom: 'Welcome',
-        prenom: 'Test',
-        email,
-        password: 'Password123!',
-        role: 'apprenant',
-      });
+    try {
+      delete process.env.SMTP_HOST;
+      delete process.env.SMTP_PORT;
+      delete process.env.SMTP_USER;
+      delete process.env.SMTP_PASSWORD;
+      delete process.env.EMAIL_FROM;
+      process.env.NODE_ENV = 'test';
+      process.env.JWT_SECRET = 'test-secret-key';
+      emailService.resetTransporter();
 
-    expect(response.status).to.equal(201);
-    expect(response.body.success).to.equal(true);
-    expect(await User.exists({ email })).to.not.equal(null);
+      const email = 'welcome.smtp-failure@test.com';
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          nom: 'Welcome',
+          prenom: 'Test',
+          email,
+          password: 'Password123!',
+          role: 'apprenant',
+        });
+
+      expect(response.status).to.equal(201);
+      expect(response.body.success).to.equal(true);
+      expect(await User.exists({ email })).to.not.equal(null);
+    } finally {
+      for (const [key, value] of Object.entries(originalValues)) {
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
+      }
+      process.env.NODE_ENV = 'test';
+      process.env.JWT_SECRET = 'test-secret-key';
+      delete require.cache[require.resolve('../app')];
+      delete require.cache[require.resolve('../src/middleware/authMiddleware')];
+      emailService.resetTransporter();
+    }
   });
 
   it('should reject an invalid registration before creating a user or sending email', async () => {

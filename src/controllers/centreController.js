@@ -23,6 +23,16 @@ const getAllCentres = async (req, res, next) => {
 const getCentreById = async (req, res, next) => {
   try {
     ensureId(req.params.id);
+
+    if (req.user && req.user.role === 'centre' && req.user.id) {
+      const ownerCentre = await centreService.findCentreByUserId(req.user.id);
+      if (ownerCentre && ownerCentre._id.toString() === req.params.id.toString()) {
+        const centre = await centreService.findCentreById(req.params.id, { includeSensitive: true });
+        if (!centre) throw createError(404, 'Centre introuvable');
+        return res.status(200).json({ success: true, data: centre });
+      }
+    }
+
     const centre = await centreService.findCentreById(req.params.id);
     if (!centre) throw createError(404, 'Centre introuvable');
     return res.status(200).json({ success: true, data: centre });

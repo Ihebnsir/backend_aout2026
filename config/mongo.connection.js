@@ -2,19 +2,36 @@ const mongoose = require("mongoose");
 
 const getMongoUrl = () => process.env.MONGO_URL || process.env["mongo-url"] || "mongodb://127.0.0.1:27017/skillbridge";
 
+const getCurrentMongoUrl = () => {
+  if (mongoose.connection?._connectionString) {
+    return mongoose.connection._connectionString;
+  }
+
+  if (mongoose.connection?.client?.s?.url) {
+    return mongoose.connection.client.s.url;
+  }
+
+  if (mongoose.connection?.uri) {
+    return mongoose.connection.uri;
+  }
+
+  return null;
+};
+
 const connectToMongoDB = async () => {
-  const currentUrl = mongoose.connection?.client?.s?.url || mongoose.connection?.uri;
+  const targetUrl = getMongoUrl();
+  const currentUrl = getCurrentMongoUrl();
 
-  if (mongoose.connection.readyState === 1) {
-    if (!currentUrl || currentUrl === getMongoUrl()) {
-      return;
-    }
+  if (mongoose.connection.readyState === 1 && currentUrl && currentUrl === targetUrl) {
+    return;
+  }
 
-    await mongoose.disconnect();
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.disconnect().catch(() => undefined);
   }
 
   try {
-    await mongoose.connect(getMongoUrl(), {
+    await mongoose.connect(targetUrl, {
       serverSelectionTimeoutMS: 5000,
     });
 

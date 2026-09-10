@@ -20,6 +20,9 @@ router.get('/', authenticate, requireRole('apprenant'), listCertificationRules, 
 // GET /api/certifications/verify/:numeroCertificat - Vérifier une certification (Public, sans auth)
 router.get('/verify/:numeroCertificat', verifyCertificationRules, validateRequest, certificationController.verifyCertification);
 
+// GET /api/certifications/:id/pdf - Générer le PDF d'une certification
+router.get('/:id/pdf', authenticate, require('../controllers/certificationPdfController').getCertificationPdf);
+
 // GET /api/certifications/:id - Récupérer une certification (Apprenant propriétaire ou Admin)
 router.get('/:id', authenticate, requireRole('admin', 'apprenant'), certificationController.getCertificationById);
 
