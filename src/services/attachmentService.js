@@ -1,8 +1,7 @@
 const mongoose = require('mongoose');
-const path = require('path');
 const createError = require('http-errors');
 const Attachment = require('../models/Attachment');
-const { writeAttachmentFile, safeAttachmentUrl, readAttachmentFile, deleteAttachmentFile, getAttachmentConfig } = require('./attachmentStorage');
+const { writeAttachmentFile, safeAttachmentUrl, readAttachmentFile, readAttachmentObject, deleteStoredAttachment, getLocalAttachmentPath } = require('./attachmentStorage');
 
 const normalizeAttachmentMetadata = (attachment) => {
   if (!attachment) return null;
@@ -13,6 +12,7 @@ const normalizeAttachmentMetadata = (attachment) => {
     originalName: record.originalName,
     storedName: record.storedName,
     storageKey: record.storageKey,
+    storageProvider: record.storageProvider || 'local',
     mimeType: record.mimeType,
     size: record.size,
     url: record.url,
@@ -31,22 +31,25 @@ const createAttachmentRecord = async ({ conversationId, uploaderId, buffer, orig
     buffer,
   });
 
-  const attachment = await Attachment.create({
-    conversationId,
-    uploaderId,
-    originalName: fileMeta.originalName,
-    storedName: fileMeta.storedName,
-    storageKey: fileMeta.storageKey,
-    mimeType: fileMeta.mimeType,
-    size: fileMeta.size,
-    url: safeAttachmentUrl(conversationId.toString(), new mongoose.Types.ObjectId().toString()),
-  });
-
-  const finalUrl = safeAttachmentUrl(conversationId.toString(), attachment._id.toString());
-  attachment.url = finalUrl;
-  await attachment.save();
-
-  return normalizeAttachmentMetadata(attachment);
+  try {
+    const attachment = await Attachment.create({
+      conversationId,
+      uploaderId,
+      originalName: fileMeta.originalName,
+      storedName: fileMeta.storedName,
+      storageKey: fileMeta.storageKey,
+      storageProvider: fileMeta.provider,
+      mimeType: fileMeta.mimeType,
+      size: fileMeta.size,
+      url: safeAttachmentUrl(conversationId.toString(), new mongoose.Types.ObjectId().toString()),
+    });
+    attachment.url = safeAttachmentUrl(conversationId.toString(), attachment._id.toString());
+    await attachment.save();
+    return normalizeAttachmentMetadata(attachment);
+  } catch (error) {
+    await deleteStoredAttachment({ storageProvider: fileMeta.provider, storageKey: fileMeta.storageKey, storedName: fileMeta.storedName }).catch(() => undefined);
+    throw error;
+  }
 };
 
 const getAttachmentById = async (attachmentId, conversationId) => {
@@ -62,26 +65,19 @@ const getAttachmentById = async (attachmentId, conversationId) => {
   return attachment;
 };
 
-const getAttachmentFilePath = (attachment) => {
-  const { storageRoot } = getAttachmentConfig();
-  const raw = attachment.storageKey || attachment.storedName;
-  const relativePath = String(raw).replace(/\\/g, '/');
-  const safeRelative = relativePath.split('/').filter(Boolean).join('/');
-  if (!safeRelative || safeRelative.startsWith('..') || safeRelative.includes('../')) {
-    throw createError(400, 'Chemin de pièce jointe invalide');
-  }
-  return path.join(storageRoot, safeRelative);
-};
+const getAttachmentFilePath = (attachment) => getLocalAttachmentPath(attachment);
 
 const getAttachmentContent = async (attachment) => {
+  if (attachment.storageProvider === 'r2') {
+    const result = await readAttachmentObject(attachment.storageKey);
+    return { content: result.content, contentType: result.contentType };
+  }
   const filePath = getAttachmentFilePath(attachment);
-  const content = await readAttachmentFile(filePath);
-  return { content, filePath };
+  return { content: await readAttachmentFile(filePath), filePath };
 };
 
 const deleteAttachment = async (attachment) => {
-  const filePath = getAttachmentFilePath(attachment);
-  await deleteAttachmentFile(filePath);
+  await deleteStoredAttachment(attachment);
   await Attachment.deleteOne({ _id: attachment._id });
 };
 

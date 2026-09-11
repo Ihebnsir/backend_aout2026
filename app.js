@@ -31,6 +31,7 @@ var errorMiddleware = require('./src/middleware/errorMiddleware');
 var logMiddleware = require('./src/middleware/logMiddleware');
 var emailService = require('./src/services/emailService');
 var setupMessagingRealtime = require('./src/realtime/messagingRealtime');
+var { validateStorageConfig } = require('./src/services/attachmentStorage');
 
 var app = express();
 
@@ -93,6 +94,7 @@ if (require.main === module) {
   setupMessagingRealtime(server, corsOrigin);
 
   const startServer = async () => {
+    validateStorageConfig();
     await connectToMongoDB();
 
     if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER
@@ -107,8 +109,9 @@ if (require.main === module) {
       console.error('[EMAIL DEBUG] SMTP verification failed: Configuration SMTP incomplète');
     }
 
-    server.listen(process.env.point || 5000, () => {
-      console.log('Server is running on port ' + (process.env.point || 5000));
+    const port = process.env.PORT || process.env.port || process.env.point || 5000;
+    server.listen(port, () => {
+      console.log('Server is running on port ' + port);
     });
   };
 

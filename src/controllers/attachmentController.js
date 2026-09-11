@@ -58,9 +58,9 @@ const downloadAttachment = async (req, res, next) => {
     }
 
     const attachment = await attachmentService.getAttachmentById(attachmentId, conversationId);
-    const { content } = await attachmentService.getAttachmentContent(attachment);
+    const { content, contentType } = await attachmentService.getAttachmentContent(attachment);
 
-    res.setHeader('Content-Type', attachment.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Type', contentType || attachment.mimeType || 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${attachment.originalName}"`);
     res.setHeader('Content-Length', String(content.length));
     return res.send(content);

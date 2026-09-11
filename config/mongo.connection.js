@@ -1,6 +1,11 @@
 const mongoose = require("mongoose");
 
-const getMongoUrl = () => process.env.MONGO_URL || process.env["mongo-url"] || "mongodb://127.0.0.1:27017/skillbridge";
+const getMongoUrl = () => {
+  const configuredUrl = process.env.MONGO_URL || process.env['mongo-url'];
+  if (configuredUrl) return configuredUrl;
+  if (process.env.NODE_ENV === 'production') return '';
+  return 'mongodb://127.0.0.1:27017/skillbridge';
+};
 
 const getCurrentMongoUrl = () => {
   if (mongoose.connection?._connectionString) {
@@ -21,6 +26,11 @@ const getCurrentMongoUrl = () => {
 const connectToMongoDB = async () => {
   const targetUrl = getMongoUrl();
   const currentUrl = getCurrentMongoUrl();
+
+  if (!targetUrl) {
+    console.error('MONGO_URL is required in production');
+    process.exit(1);
+  }
 
   if (mongoose.connection.readyState === 1 && currentUrl && currentUrl === targetUrl) {
     return;

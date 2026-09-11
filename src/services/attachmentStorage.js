@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const createError = require('http-errors');
+const { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
 
 const DEFAULT_ALLOWED_MIME_TYPES = {
   'application/pdf': 'pdf',
@@ -17,11 +18,15 @@ const DEFAULT_ALLOWED_MIME_TYPES = {
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
 };
 
+let r2Client;
+
 const getAttachmentConfig = () => {
+  const provider = String(process.env.ATTACHMENT_STORAGE_PROVIDER || 'local').toLowerCase();
   const storageRoot = process.env.ATTACHMENT_STORAGE_DIR || path.join(process.cwd(), '.attachments');
   const maxSize = Number(process.env.MAX_ATTACHMENT_SIZE || 10 * 1024 * 1024);
   const maxPerMessage = Number(process.env.MAX_ATTACHMENTS_PER_MESSAGE || 5);
   return {
+    provider,
     storageRoot,
     maxSize: Number.isFinite(maxSize) && maxSize > 0 ? maxSize : 10 * 1024 * 1024,
     maxPerMessage: Number.isFinite(maxPerMessage) && maxPerMessage > 0 ? maxPerMessage : 5,
@@ -29,10 +34,38 @@ const getAttachmentConfig = () => {
   };
 };
 
+const validateStorageConfig = () => {
+  const { provider } = getAttachmentConfig();
+  if (!['local', 'r2'].includes(provider)) {
+    throw createError(500, 'ATTACHMENT_STORAGE_PROVIDER doit être local ou r2');
+  }
+  if (provider === 'r2') {
+    const required = ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_ENDPOINT'];
+    const missing = required.filter((key) => !process.env[key]?.trim());
+    if (missing.length) throw createError(500, `Configuration R2 incomplète: ${missing.join(', ')}`);
+  }
+  return provider;
+};
+
+const getR2Client = () => {
+  validateStorageConfig();
+  if (!r2Client) {
+    r2Client = new S3Client({
+      region: 'auto',
+      endpoint: process.env.R2_ENDPOINT,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+      },
+    });
+  }
+  return r2Client;
+};
+
 const sanitizeOriginalName = (originalName) => {
   const safeName = String(originalName || 'upload').replace(/[\\/]+/g, ' ').trim();
   const base = path.basename(safeName) || 'upload';
-  return base.replace(/\s+/g, ' ');
+  return base.replace(/["\r\n]/g, '').replace(/\s+/g, ' ') || 'upload';
 };
 
 const buildStorageKey = (conversationId, userId, originalName, mimeType) => {
@@ -76,8 +109,26 @@ const writeAttachmentFile = async ({ conversationId, userId, originalName, mimeT
 
   const safeOriginalName = sanitizeOriginalName(originalName);
   const storageKey = ensureSafeStoragePath(buildStorageKey(conversationId, userId, safeOriginalName, mimeType));
-  const dir = getConversationStorageDir(conversationId, userId);
   const fileName = path.basename(storageKey);
+
+  if (getAttachmentConfig().provider === 'r2') {
+    await getR2Client().send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: storageKey,
+      Body: buffer,
+      ContentType: mimeType,
+    }));
+    return {
+      provider: 'r2',
+      originalName: safeOriginalName,
+      storedName: fileName,
+      storageKey,
+      mimeType,
+      size: buffer.length,
+    };
+  }
+
+  const dir = getConversationStorageDir(conversationId, userId);
   const filePath = path.join(dir, fileName);
 
   if (filePath.includes('..')) {
@@ -87,6 +138,7 @@ const writeAttachmentFile = async ({ conversationId, userId, originalName, mimeT
   await fs.promises.writeFile(filePath, buffer, { flag: 'w', mode: 0o600 });
 
   return {
+    provider: 'local',
     originalName: safeOriginalName,
     storedName: fileName,
     storageKey,
@@ -94,6 +146,15 @@ const writeAttachmentFile = async ({ conversationId, userId, originalName, mimeT
     size: buffer.length,
     absolutePath: filePath,
   };
+};
+
+const streamToBuffer = async (body) => {
+  if (body && typeof body.transformToByteArray === 'function') {
+    return Buffer.from(await body.transformToByteArray());
+  }
+  const chunks = [];
+  for await (const chunk of body) chunks.push(Buffer.from(chunk));
+  return Buffer.concat(chunks);
 };
 
 const readAttachmentFile = async (filePath) => {
@@ -114,8 +175,53 @@ const deleteAttachmentFile = async (filePath) => {
   }
 };
 
+const readAttachmentObject = async (storageKey) => {
+  try {
+    const result = await getR2Client().send(new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: ensureSafeStoragePath(storageKey),
+    }));
+    return {
+      content: await streamToBuffer(result.Body),
+      contentType: result.ContentType,
+    };
+  } catch (error) {
+    if (error?.name === 'NoSuchKey' || error?.$metadata?.httpStatusCode === 404) {
+      throw createError(404, 'Fichier introuvable');
+    }
+    throw error;
+  }
+};
+
+const deleteAttachmentObject = async (storageKey) => {
+  try {
+    await getR2Client().send(new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: ensureSafeStoragePath(storageKey),
+    }));
+  } catch (error) {
+    if (error?.name !== 'NoSuchKey' && error?.$metadata?.httpStatusCode !== 404) throw error;
+  }
+};
+
+const deleteStoredAttachment = async (attachment) => {
+  if (attachment.storageProvider === 'r2') return deleteAttachmentObject(attachment.storageKey);
+  return deleteAttachmentFile(getLocalAttachmentPath(attachment));
+};
+
+const getLocalAttachmentPath = (attachment) => {
+  const { storageRoot } = getAttachmentConfig();
+  const relativePath = String(attachment.storageKey || attachment.storedName).replace(/\\/g, '/');
+  const safeRelative = relativePath.split('/').filter(Boolean).join('/');
+  if (!safeRelative || safeRelative.startsWith('..') || safeRelative.includes('../')) {
+    throw createError(400, 'Chemin de pièce jointe invalide');
+  }
+  return path.join(storageRoot, safeRelative);
+};
+
 module.exports = {
   getAttachmentConfig,
+  validateStorageConfig,
   sanitizeOriginalName,
   buildStorageKey,
   validateMimeType,
@@ -125,5 +231,10 @@ module.exports = {
   readAttachmentFile,
   safeAttachmentUrl,
   deleteAttachmentFile,
+  getR2Client,
+  readAttachmentObject,
+  deleteAttachmentObject,
+  deleteStoredAttachment,
+  getLocalAttachmentPath,
   DEFAULT_ALLOWED_MIME_TYPES,
 };

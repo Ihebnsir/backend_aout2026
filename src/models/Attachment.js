@@ -32,6 +32,12 @@ const attachmentSchema = new mongoose.Schema(
       trim: true,
       maxlength: 512,
     },
+    storageProvider: {
+      type: String,
+      enum: ['local', 'r2'],
+      default: 'local',
+      required: true,
+    },
     mimeType: {
       type: String,
       required: true,
