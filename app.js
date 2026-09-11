@@ -35,7 +35,8 @@ var { validateStorageConfig } = require('./src/services/attachmentStorage');
 
 var app = express();
 
-const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+const isProduction = process.env.NODE_ENV === 'production';
+const corsOrigin = (process.env.CORS_ORIGIN || (isProduction ? '' : 'http://localhost:3000')).trim();
 app.use((req, res, next) => {
   const requestOrigin = req.headers.origin;
 
@@ -59,6 +60,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/health', (req, res) => {
+  res.json({ success: true });
+});
 
 app.use('/', indexRouter);
 app.use('/api/auth', authRouter);
@@ -94,6 +99,13 @@ if (require.main === module) {
   setupMessagingRealtime(server, corsOrigin);
 
   const startServer = async () => {
+    if (isProduction && !corsOrigin) {
+      throw new Error('CORS_ORIGIN is required in production');
+    }
+    if (isProduction && !process.env.JWT_SECRET?.trim()) {
+      throw new Error('JWT_SECRET is required in production');
+    }
+
     validateStorageConfig();
     await connectToMongoDB();
 
@@ -109,13 +121,16 @@ if (require.main === module) {
       console.error('[EMAIL DEBUG] SMTP verification failed: Configuration SMTP incomplète');
     }
 
-    const port = process.env.PORT || process.env.port || process.env.point || 5000;
-    server.listen(port, () => {
+    const port = process.env.PORT || 5000;
+    server.listen(port, '0.0.0.0', () => {
       console.log('Server is running on port ' + port);
     });
   };
 
-  startServer();
+  startServer().catch((error) => {
+    console.error('Server startup failed:', error.message);
+    process.exit(1);
+  });
 }
 
 module.exports = app;

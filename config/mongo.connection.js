@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const getMongoUrl = () => {
-  const configuredUrl = process.env.MONGO_URL || process.env['mongo-url'];
+  const configuredUrl = process.env.MONGO_URL;
   if (configuredUrl) return configuredUrl;
   if (process.env.NODE_ENV === 'production') return '';
   return 'mongodb://127.0.0.1:27017/skillbridge';
