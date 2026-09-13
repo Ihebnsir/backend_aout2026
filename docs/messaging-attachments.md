@@ -2,9 +2,9 @@
 
 ## Storage mechanism
 
-The backend uses a local, conversation-scoped filesystem abstraction under the configured `ATTACHMENT_STORAGE_DIR` directory. Files are written outside the public web root and are stored with unpredictable, server-generated names. The original client filename is kept only as display metadata and is never used as a filesystem path.
+The backend uses a conversation-scoped storage abstraction. The default provider is local under the configured `ATTACHMENT_STORAGE_DIR` directory; Cloudflare R2 and private Supabase Storage are also supported through `ATTACHMENT_STORAGE_PROVIDER`. Files use unpredictable, server-generated names. The original client filename is kept only as display metadata and is never used as a storage path.
 
-This design keeps the API compatible with a future migration to S3, Cloudinary, or another object store by isolating the storage details behind the attachment storage service.
+For Supabase, set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET`. The service-role key is backend-only. The bucket must remain private; the backend reads and deletes objects through the storage SDK after the existing conversation authorization checks, and never creates public URLs.
 
 ## Upload endpoint
 
@@ -88,6 +88,8 @@ The actual binary file is never stored inside MongoDB.
 
 This implementation does not perform malware scanning or AV analysis. That limitation is documented intentionally because no malware scanning service is configured in this backend. The local filesystem abstraction is still secure against path traversal, public exposure, and unauthorized access by verifying conversation membership before file reads.
 
-## Migration path
+## Storage provider configuration
 
-The storage service is isolated behind a small abstraction, so a future migration to S3, Cloudinary, or another provider requires only replacing the local write/read logic without rewiring the conversation, notification, or Socket.IO flow.
+- `ATTACHMENT_STORAGE_PROVIDER=local` (default): uses `ATTACHMENT_STORAGE_DIR`.
+- `ATTACHMENT_STORAGE_PROVIDER=r2`: requires the existing `R2_*` settings.
+- `ATTACHMENT_STORAGE_PROVIDER=supabase`: requires all three `SUPABASE_*` settings above. Incomplete Supabase configuration fails at the backend provider boundary and never falls back to local storage.

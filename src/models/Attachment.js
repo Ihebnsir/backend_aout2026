@@ -34,7 +34,7 @@ const attachmentSchema = new mongoose.Schema(
     },
     storageProvider: {
       type: String,
-      enum: ['local', 'r2'],
+      enum: ['local', 'r2', 'supabase'],
       default: 'local',
       required: true,
     },

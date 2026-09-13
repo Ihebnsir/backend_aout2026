@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const createError = require('http-errors');
 const Attachment = require('../models/Attachment');
-const { writeAttachmentFile, safeAttachmentUrl, readAttachmentFile, readAttachmentObject, deleteStoredAttachment, getLocalAttachmentPath } = require('./attachmentStorage');
+const { writeAttachmentFile, safeAttachmentUrl, readAttachmentFile, readAttachmentObject, readSupabaseObject, deleteStoredAttachment, getLocalAttachmentPath } = require('./attachmentStorage');
 
 const normalizeAttachmentMetadata = (attachment) => {
   if (!attachment) return null;
@@ -68,8 +68,10 @@ const getAttachmentById = async (attachmentId, conversationId) => {
 const getAttachmentFilePath = (attachment) => getLocalAttachmentPath(attachment);
 
 const getAttachmentContent = async (attachment) => {
-  if (attachment.storageProvider === 'r2') {
-    const result = await readAttachmentObject(attachment.storageKey);
+  if (attachment.storageProvider === 'r2' || attachment.storageProvider === 'supabase') {
+    const result = attachment.storageProvider === 'supabase'
+      ? await readSupabaseObject(attachment.storageKey)
+      : await readAttachmentObject(attachment.storageKey);
     return { content: result.content, contentType: result.contentType };
   }
   const filePath = getAttachmentFilePath(attachment);
